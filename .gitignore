@@ -1,0 +1,13 @@
+# Build & Binary Output
+bin/
+build/
+*.o
+*.out
+*.exe
+*.d
+*.log
+
+# Configurations (Keep templates only)
+*.json
+!*.example.json
+!config.example.json

@@ -67,7 +67,7 @@ bool StratumClient::connect_to_server() {
     connected_ = true;
 
     // 1. mining.subscribe
-    std::string sub_req = "{\"id\": 1, \"method\": \"mining.subscribe\", \"params\": [\"Blake2bCudaMiner/1.1\"]}\n";
+    std::string sub_req = "{\"id\": 1, \"method\": \"mining.subscribe\", \"params\": [\"Blake2bCudaMiner/1.2\"]}\n";
     send_line(sub_req);
 
     // 2. mining.authorize

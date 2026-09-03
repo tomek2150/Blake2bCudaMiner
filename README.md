@@ -68,7 +68,7 @@ graph TD
 | Miner | Hashrate | Optimization Level | Architecture |
 | :--- | :--- | :--- | :--- |
 | **`ccminer` (Legacy)** | ~6,250 MH/s (6.25 GH/s) | Baseline (full 80B hash per thread) | Generic SM |
-| **`Blake2bCudaMiner`** | **~6,880+ MH/s (6.88+ GH/s)** | Midstate + Funnel-Shifts + Zero-Folding + Multi-Stream + PTX lop3 | Native SM / PTX |
+| **`Blake2bCudaMiner`** | **~7,000 MH/s (7 GH/s)** | Midstate + Funnel-Shifts + Zero-Folding + Multi-Stream + PTX lop3 | Native SM / PTX |
 
 ---
 

@@ -93,7 +93,7 @@ void print_help(const char* prog_name) {
 
       )ASCII" << "\n";
     std::cout << "================================================================================\n";
-    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v.1\n";
+    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.1\n";
     std::cout << "================================================================================\n";
     std::cout << "Usage: " << prog_name << " [OPTIONS]\n\n";
     std::cout << "Options:\n";
@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
     }
 
     std::cout << "============================================================" << std::endl;
-    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.0" << std::endl;
+    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.1" << std::endl;
     std::cout << "============================================================" << std::endl;
 
     cudaSetDevice(device_id);

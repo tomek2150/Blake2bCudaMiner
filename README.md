@@ -108,11 +108,12 @@ cp config.example.json config.json
 ```
 
 #### CLI Options:
-* `-o, --url` : Stratum server URL (Default: `127.0.0.1:3333`)
-* `-u, --user` : Mining username
-* `-p, --pass` : Mining password
-* `-d, --device` : CUDA Device ID (Default: `0`)
-* `-b, --block-size` : Threads per CUDA block (Default: `512`)
+* `-o, --url <url>` : Stratum server URL (Default: `127.0.0.1:3333`)
+* `-u, --user <username>` : Mining username or payout address (Default: `miner`)
+* `-p, --pass <password>` : Mining password (Default: `x`)
+* `-d, --device <id>` : CUDA Device ID (Default: `0`)
+* `-b, --block-size <n>` : Threads per CUDA block (Default: `512`)
+* `-h, --help` : Display help message and options
 
 ---
 

@@ -197,10 +197,17 @@ void blake2b_search_kernel(
     G(v3, v4, v9,  v14, d_midstate.m[5], d_midstate.m[3]);
 
     /* =====================================================================
-     * Finalization & Target Comparison
+     * Finalization & Target Comparison (PTX lop3.lut 3-way XOR + byte perm)
      * ===================================================================== */
-    uint64_t h3 = BLAKE2B_256_INIT[3] ^ v3 ^ v11;
-    uint64_t h3_be = bswap64_device(h3);
+    uint32_t v3_lo = (uint32_t)v3,   v3_hi = (uint32_t)(v3 >> 32);
+    uint32_t v11_lo = (uint32_t)v11, v11_hi = (uint32_t)(v11 >> 32);
+
+    uint32_t h3_lo = xor3_b32((uint32_t)BLAKE2B_256_INIT[3], v3_lo, v11_lo);
+    uint32_t h3_hi = xor3_b32((uint32_t)(BLAKE2B_256_INIT[3] >> 32), v3_hi, v11_hi);
+
+    uint32_t r_hi = __byte_perm(h3_lo, 0, 0x0123);
+    uint32_t r_lo = __byte_perm(h3_hi, 0, 0x0123);
+    uint64_t h3_be = ((uint64_t)r_hi << 32) | r_lo;
 
     if (h3_be <= target_diff) {
         uint32_t idx = atomicAdd(out_count, 1);
@@ -364,10 +371,10 @@ __global__ void blake2b_single_hash_kernel(uint32_t nonce, uint64_t* out_h) {
     G_ZERO_X(v2, v7, v8,  v13, d_midstate.m[7]);
     G(v3, v4, v9,  v14, d_midstate.m[5], d_midstate.m[3]);
 
-    out_h[0] = BLAKE2B_256_INIT[0] ^ v0 ^ v8;
-    out_h[1] = BLAKE2B_256_INIT[1] ^ v1 ^ v9;
-    out_h[2] = BLAKE2B_256_INIT[2] ^ v2 ^ v10;
-    out_h[3] = BLAKE2B_256_INIT[3] ^ v3 ^ v11;
+    out_h[0] = xor3_b64(BLAKE2B_256_INIT[0], v0, v8);
+    out_h[1] = xor3_b64(BLAKE2B_256_INIT[1], v1, v9);
+    out_h[2] = xor3_b64(BLAKE2B_256_INIT[2], v2, v10);
+    out_h[3] = xor3_b64(BLAKE2B_256_INIT[3], v3, v11);
 }
 
 extern "C" cudaError_t blake2b_compute_single_hash_gpu(uint32_t nonce, uint64_t out_h[4]) {

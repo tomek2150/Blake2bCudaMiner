@@ -95,6 +95,28 @@ __device__ __forceinline__ uint64_t bswap64_device(uint64_t x) {
     return ((uint64_t)r_hi << 32) | r_lo;
 }
 
+/**
+ * @brief Fuses a 3-input XOR (a ^ b ^ c) into a single 1-cycle PTX instruction.
+ * Uses NVIDIA lop3.lut with truth table 0x96.
+ */
+__device__ __forceinline__ uint32_t xor3_b32(uint32_t a, uint32_t b, uint32_t c) {
+    uint32_t res;
+    asm("lop3.b32 %0, %1, %2, %3, 0x96;" : "=r"(res) : "r"(a), "r"(b), "r"(c));
+    return res;
+}
+
+/**
+ * @brief 64-bit 3-input XOR using two 1-cycle lop3.b32 instructions.
+ */
+__device__ __forceinline__ uint64_t xor3_b64(uint64_t a, uint64_t b, uint64_t c) {
+    uint32_t a_lo = (uint32_t)a, a_hi = (uint32_t)(a >> 32);
+    uint32_t b_lo = (uint32_t)b, b_hi = (uint32_t)(b >> 32);
+    uint32_t c_lo = (uint32_t)c, c_hi = (uint32_t)(c >> 32);
+    uint32_t r_lo = xor3_b32(a_lo, b_lo, c_lo);
+    uint32_t r_hi = xor3_b32(a_hi, b_hi, c_hi);
+    return ((uint64_t)r_hi << 32) | r_lo;
+}
+
 /* =========================================================================
  * Blake2b G-function macros with Zero-Folding
  * ========================================================================= */

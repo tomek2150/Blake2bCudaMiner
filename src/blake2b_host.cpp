@@ -50,10 +50,11 @@ void blake2b_precompute_midstate(const uint8_t header_80[80], uint32_t target_di
     uint64_t m[16] = {0};
     std::memcpy(m, header_80, 80);
 
-    // Copy static words m[0..8]
-    for (int i = 0; i < 9; ++i) {
+    // Copy static words m[0..9] to midstate (m[4] high 32-bit is nonce2)
+    for (int i = 0; i < 10; ++i) {
         out_midstate->m[i] = m[i];
     }
+    out_midstate->nonce2 = (uint32_t)(m[4] >> 32);
 
     // 2. Initialize working state v[0..15]
     uint64_t v[16];
@@ -74,23 +75,16 @@ void blake2b_precompute_midstate(const uint8_t header_80[80], uint32_t target_di
     v[14] = IV[6] ^ 0xFFFFFFFFFFFFFFFFULL;  // f0 = ~0 (final block)
     v[15] = IV[7] ^ 0ULL;                   // f1 = 0
 
-    // 3. Precompute Round 0 column step
+    // 3. Precompute Round 0 static column steps (Column 0, 1, 3)
     G_CPU(v, 0, 4,  8, 12, m[0], m[1]);
     G_CPU(v, 1, 5,  9, 13, m[2], m[3]);
-    G_CPU(v, 2, 6, 10, 14, m[4], m[5]);
+    // Column 2: G_CPU(v, 2, 6, 10, 14, m[4], m[5]) uses dynamic m[4] and is executed on GPU!
     G_CPU(v, 3, 7, 11, 15, m[6], m[7]);
-
-    // 4. Precompute the 3 static branches of Round 0 diagonal (does not depend on m8/m9)
-    G_CPU(v, 1, 6, 11, 12, 0, 0);
-    G_CPU(v, 2, 7,  8, 13, 0, 0);
-    G_CPU(v, 3, 4,  9, 14, 0, 0);
 
     // Store precomputed state v[0..15]
     for (int i = 0; i < 16; ++i) {
         out_midstate->v[i] = v[i];
     }
-
-    out_midstate->nbits = target_diff_bits;
 
     // Compact target (target high word)
     uint32_t exponent = target_diff_bits >> 24;

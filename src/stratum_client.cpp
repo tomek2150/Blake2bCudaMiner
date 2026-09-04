@@ -67,7 +67,7 @@ bool StratumClient::connect_to_server() {
     connected_ = true;
 
     // 1. mining.subscribe
-    std::string sub_req = "{\"id\": 1, \"method\": \"mining.subscribe\", \"params\": [\"Blake2bCudaMiner/1.3\"]}\n";
+    std::string sub_req = "{\"id\": 1, \"method\": \"mining.subscribe\", \"params\": [\"Blake2bCudaMiner/1.3.1\"]}\n";
     send_line(sub_req);
 
     // 2. mining.authorize
@@ -149,7 +149,10 @@ void StratumClient::handle_line(const std::string& line) {
                 int depth = 0;
                 for (size_t i = start + 1; i < line.length(); ++i) {
                     char c = line[i];
-                    if (c == '\"') in_str = !in_str;
+                    if (c == '\"') {
+                        in_str = !in_str;
+                        continue;
+                    }
                     else if (c == '[' && !in_str) depth++;
                     else if (c == ']' && !in_str) {
                         if (depth == 0) { if (!cur.empty()) tokens.push_back(cur); break; }
@@ -160,7 +163,7 @@ void StratumClient::handle_line(const std::string& line) {
                         cur.clear();
                         continue;
                     }
-                    if (in_str || depth > 0 || (c != ' ' && c != '\"')) cur += c;
+                    if (in_str || depth > 0 || c != ' ') cur += c;
                 }
 
                 if (tokens.size() >= 8) {
@@ -195,7 +198,16 @@ void StratumClient::handle_line(const std::string& line) {
 }
 
 void StratumClient::build_header_template(StratumJobData& job) {
-    // Construct Coinbase TX (with fixed extranonce2 = 0)
+    if (job.prevhash_hex.length() == 160) {
+        // Bitcoin Knots Profile 0: Full 80-byte precomputed ASIC message directly provided
+        std::vector<uint8_t> h = hex_to_bytes(job.prevhash_hex);
+        if (h.size() == 80) {
+            std::memcpy(job.header_template, h.data(), 80);
+            return;
+        }
+    }
+
+    // Fallback: Construct Coinbase TX (with fixed extranonce2 = 0)
     std::string xn2 = std::string(extranonce2_size_ * 2, '0');
     std::string cb_hex = job.coinb1_hex + extranonce1_ + xn2 + job.coinb2_hex;
     std::vector<uint8_t> cb_bytes = hex_to_bytes(cb_hex);
@@ -209,8 +221,8 @@ void StratumClient::build_header_template(StratumJobData& job) {
 
     // Reverse 32-bit word swap of prevhash
     std::vector<uint8_t> prev_bytes = hex_to_bytes(job.prevhash_hex);
-    uint8_t prev_swapped[32];
-    for (size_t i = 0; i < 32; i += 4) {
+    uint8_t prev_swapped[32] = {0};
+    for (size_t i = 0; i < 32 && i + 3 < prev_bytes.size(); i += 4) {
         prev_swapped[i + 0] = prev_bytes[i + 3];
         prev_swapped[i + 1] = prev_bytes[i + 2];
         prev_swapped[i + 2] = prev_bytes[i + 1];

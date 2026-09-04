@@ -93,7 +93,7 @@ void print_help(const char* prog_name) {
 
       )ASCII" << "\n";
     std::cout << "================================================================================\n";
-    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.3\n";
+    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.3.1\n";
     std::cout << "================================================================================\n";
     std::cout << "Usage: " << prog_name << " [OPTIONS]\n\n";
     std::cout << "Options:\n";
@@ -151,9 +151,9 @@ int main(int argc, char** argv) {
         port = std::stoi(pool_url.substr(colon + 1));
     }
 
-    std::cout << "============================================================" << std::endl;
-    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.3" << std::endl;
-    std::cout << "============================================================" << std::endl;
+    std::cout << "=================================================================" << std::endl;
+    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.3.1" << std::endl;
+    std::cout << "=================================================================" << std::endl;
 
     cudaSetDevice(device_id);
     cudaDeviceProp prop;
@@ -201,6 +201,7 @@ int main(int argc, char** argv) {
     stratum.set_job_callback([&](const StratumJobData& job) {
         current_job = job;
         blake2b_precompute_midstate(job.header_template, job.nbits, &current_midstate);
+        std::cout << "  • New Mining Job Received: ID " << job.job_id << " (Profile 0 80B Work Ready)" << std::endl;
         job_changed = true;
         new_job_ready = true;
     });

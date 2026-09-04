@@ -10,18 +10,19 @@ Compared to legacy miners (such as `ccminer`), substantial low-level optimizatio
 
 ```mermaid
 graph TD
-    A[80-Byte Bitcoin Header] --> B[Host / CPU: Midstate Precomputation]
-    B -->|Precomputed 64B + 7/8 R0 Steps| C[GPU Kernel: Only 1 Dynamic Step in R0]
-    C --> D[Zero-Folding: m10..m15 = 0 Eliminates 38% of Additions]
+    A[Bitcoin Knots Block Header] --> B[Host / CPU: Midstate Precomputation]
+    B -->|Static 64B + R0 Steps| C[GPU Kernel: Dynamic Nonce Hashing]
+    C --> D[Zero-Folding: m10..m15 = 0 Eliminates 38% Additions]
     D --> E[Hardware Funnel-Shifts: ROR64 in 1 Clock Cycle]
     E --> F[Multi-Stream Double Buffering: 0 ms GPU Idle Time]
     F --> G[PTX lop3.lut: 1-Cycle 3-Way XOR Logic Fusion]
+    G -->|Valid Share| H[Solo Proxy: Direct Block Submission to Node]
 ```
 
-### 1. Midstate Precomputation (Header & Round Splitting)
-* **Legacy Miner Bottleneck:** Legacy miners compute the full 80-byte header and all 12 rounds (96 G-steps) from scratch for every single nonce, even though the first 64 bytes remain strictly constant.
-* **Optimization:** The first 64 bytes and **7 out of 8 G-steps in Round 0** are precomputed once on the CPU. The GPU executes only the single nonce-dependent G-step in Round 0.
-* **Impact:** Eliminates ~45% of arithmetic instructions per nonce.
+### 1. High-Throughput Midstate Precomputation
+* **Algorithmic Efficiency:** Instead of computing full 12 rounds (96 G-steps) from scratch for every single nonce, static header words and initial Round 0 transformation steps are precomputed once on the CPU.
+* **GPU Focus:** The GPU executes only the dynamic, nonce-dependent transformation steps and remaining rounds.
+* **Impact:** Eliminates ~45% of redundant shader arithmetic per nonce, maximizing throughput.
 
 ### 2. Zero-Folding ($m_{10} \dots m_{15} = 0$)
 * **Legacy Miner Bottleneck:** In an 80-byte block header, words $m_{10} \dots m_{15}$ are always zero. Unoptimized code repeatedly performs $a = a + b + 0$.
@@ -95,7 +96,7 @@ make all
 ## 🧪 Tests & Verification
 
 ```bash
-# 1. Automated correctness test (100 nonces verified against CPU reference)
+# 1. Automated correctness test (100 nonces CPU vs GPU + Live Bitcoin Knots Block 967420 verification)
 ./bin/test_correctness
 
 # 2. Throughput & block-size parameter benchmark

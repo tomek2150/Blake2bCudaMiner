@@ -154,6 +154,135 @@ def compute_merkle_branches(txids: List[bytes]) -> List[str]:
     return branches
 
 
+def tagged_sha256(tag: str, data: bytes) -> bytes:
+    """Core's TaggedHash writer finished with GetSHA256() (single SHA256)."""
+    t = hashlib.sha256(tag.encode("utf-8")).digest()
+    return hashlib.sha256(t + t + data).digest()
+
+
+class HeaderV2:
+    """Bitcoin Knots 164-Byte Block Header v2 consensus implementation."""
+
+    def __init__(
+        self,
+        nVersion: int,
+        hashPrevBlock: bytes,
+        hashMerkleRoot: bytes,
+        nTime: int,
+        nBits: int,
+        nNonce: int = 0,
+        m_nonce2: int = 0,
+        m_nonce3: int = 0,
+        m_extranonce: bytes = b"\x00" * 16,
+        m_time_offset: int = 0,
+        m_txcount: int = 0,
+        m_flags: int = 0,
+        m_xor_key_mask_clear_bits: int = 0,
+        m_xor_key: bytes = b"\x00" * 16,
+        m_height: int = 0,
+        m_mm_rhs: bytes = b"\x00" * 32,
+    ):
+        self.nVersion = nVersion
+        self.hashPrevBlock = hashPrevBlock
+        self.hashMerkleRoot = hashMerkleRoot
+        self.nTime = nTime
+        self.nBits = nBits
+        self.nNonce = nNonce
+        self.m_nonce2 = m_nonce2
+        self.m_nonce3 = m_nonce3
+        self.m_extranonce = m_extranonce
+        self.m_time_offset = m_time_offset
+        self.m_txcount = m_txcount
+        self.m_flags = m_flags
+        self.m_xor_key_mask_clear_bits = m_xor_key_mask_clear_bits
+        self.m_xor_key = m_xor_key
+        self.m_height = m_height
+        self.m_mm_rhs = m_mm_rhs
+
+    def complete_version(self) -> int:
+        return 0x80000000 | (self.nVersion & ~0x80000000)
+
+    def time_on_wire(self) -> int:
+        if not (self.m_flags & 4):
+            return self.nTime
+        return (self.nTime - self.m_time_offset) & 0xFFFFFFFF
+
+    def serialize(self) -> bytes:
+        b = (
+            struct.pack("<I", self.complete_version())
+            + self.hashPrevBlock
+            + self.hashMerkleRoot
+            + struct.pack("<I", self.time_on_wire())
+            + struct.pack("<I", self.nBits)
+            + struct.pack("<I", self.nNonce)
+            + struct.pack("<I", self.m_nonce2)
+            + struct.pack("<I", self.m_nonce3)
+            + self.m_extranonce
+            + struct.pack("<I", self.m_time_offset)
+            + struct.pack("<H", self.m_txcount & 0xFFFF)
+            + bytes([self.m_flags, self.m_xor_key_mask_clear_bits])
+            + self.m_xor_key
+            + struct.pack("<i", self.m_height)
+            + self.m_mm_rhs
+        )
+        assert len(b) == 164, f"Invalid serialized header length: {len(b)}"
+        return b
+
+    def xor_key_hash(self) -> bytes:
+        return tagged_sha256("Bitcoin block hash PoW XOR key", self.m_xor_key)
+
+    def xor_key_mask(self) -> bytes:
+        if self.m_xor_key == b"\x00" * 16:
+            return b"\x00" * 32
+        mask = bytearray(tagged_sha256("Bitcoin block hash PoW XOR mask", self.m_xor_key))
+        clear = self.m_xor_key_mask_clear_bits
+        for i in range(clear // 8):
+            mask[i] = 0
+        mask[clear // 8] &= 0xFF >> (clear % 8)
+        return bytes(mask)
+
+    def h1(self) -> bytes:
+        data = (
+            struct.pack("<I", self.complete_version())
+            + self.hashPrevBlock[::-1]
+            + struct.pack("<i", self.m_height)
+            + self.hashMerkleRoot
+            + struct.pack("<I", self.time_on_wire())
+            + b"\x00"
+            + struct.pack("<I", self.nBits)
+            + struct.pack("<I", self.m_txcount)
+            + bytes([self.m_flags, self.m_xor_key_mask_clear_bits])
+            + self.xor_key_hash()
+        )
+        assert len(data) == 119
+        return tagged_sha256("Bitcoin block header 1", data)
+
+    def h2(self) -> bytes:
+        return tagged_sha256("Merge-mining hook", self.h1() + b"\x00" * 32 + self.m_mm_rhs)
+
+    def sv1_hash(self) -> bytes:
+        payload = struct.pack("<I", 0) + self.h2() + self.m_extranonce
+        assert len(payload) == 52
+        return blake2b_256(payload)
+
+    def asic_message(self) -> bytes:
+        grind = struct.pack("<I", self.nNonce) + struct.pack("<I", self.m_nonce2)
+        hidden = bytearray(tagged_sha256("Bitcoin prevblock header, hashed", self.hashPrevBlock[::-1]))
+        hidden[0:6] = b"\x00" * 6
+        msg = (bytes(hidden) + grind + struct.pack("<I", self.m_time_offset)
+               + struct.pack("<I", self.m_nonce3) + self.sv1_hash())
+        assert len(msg) == 80
+        return msg
+
+    def powhash(self) -> bytes:
+        raw = blake2b_256(self.asic_message())
+        mask = self.xor_key_mask()
+        return bytes(raw[i] ^ mask[i] for i in range(32))[::-1]
+
+    def block_hash_hex(self) -> str:
+        return self.powhash()[::-1].hex()
+
+
 class StratumJob:
     """Encapsulates a single Stratum job derived from a GBT template."""
 
@@ -189,6 +318,33 @@ class StratumJob:
 
         self._build_coinbase_parts()
         self.merkle_branches = compute_merkle_branches([b"\x00" * 32] + self.tx_hashes)
+
+        # Precompute initial Merkle Root (for extranonce2 = 0)
+        coinbase_bytes = (
+            bytes.fromhex(self.coinb1)
+            + bytes.fromhex(self.extranonce1)
+            + (b"\x00" * self.extranonce2_size)
+            + bytes.fromhex(self.coinb2)
+        )
+        coinbase_hash = double_sha256(coinbase_bytes)
+        merkle_root = coinbase_hash
+        for branch_hex in self.merkle_branches:
+            merkle_root = double_sha256(merkle_root + bytes.fromhex(branch_hex))
+
+        extranonce_raw = (bytes.fromhex(self.extranonce1) + (b"\x00" * self.extranonce2_size)).ljust(16, b"\x00")[:16]
+
+        self.header_v2 = HeaderV2(
+            nVersion=self.version & ~0x80000000,
+            hashPrevBlock=bytes.fromhex(self.previousblockhash)[::-1],
+            hashMerkleRoot=merkle_root,
+            nTime=self.curtime,
+            nBits=self.bits,
+            nNonce=0,
+            m_extranonce=extranonce_raw,
+            m_txcount=1 + len(self.raw_transactions),
+            m_height=self.height,
+        )
+        self.work_msg_80 = self.header_v2.asic_message()
 
     def _build_coinbase_parts(self) -> None:
         """Constructs coinb1 and coinb2 parts."""
@@ -228,15 +384,14 @@ class StratumJob:
         self.coinb2 = (sequence + tx_outs + struct.pack("<I", 0)).hex()
 
     def get_notify_params(self, clean_jobs: bool = True) -> List[Any]:
-        """Returns parameters for mining.notify."""
-        prevhash_swapped = swap32_hex(self.previousblockhash)
+        """Returns parameters for mining.notify with 80-byte Profile 0 ASIC template."""
         version_hex = struct.pack(">I", self.version).hex()
         nbits_hex = struct.pack(">I", self.bits).hex()
         ntime_hex = struct.pack(">I", self.curtime).hex()
 
         return [
             self.job_id,
-            prevhash_swapped,
+            self.work_msg_80.hex(),  # 160 hex characters = 80-byte Profile 0 ASIC message
             self.coinb1,
             self.coinb2,
             self.merkle_branches,
@@ -247,7 +402,7 @@ class StratumJob:
         ]
 
     def build_full_block(self, extranonce2: str, ntime_hex: str, nonce_hex: str) -> Tuple[bytes, bytes]:
-        """Reconstructs the full 80-byte header and serialized block."""
+        """Reconstructs the full 164-byte Header v2 and serialized block for Bitcoin Knots."""
         coinbase_bytes = (
             bytes.fromhex(self.coinb1)
             + bytes.fromhex(self.extranonce1)
@@ -258,36 +413,26 @@ class StratumJob:
 
         merkle_root = coinbase_hash
         for branch_hex in self.merkle_branches:
-            branch_bytes = bytes.fromhex(branch_hex)
-            merkle_root = double_sha256(merkle_root + branch_bytes)
-
-        if len(ntime_hex) == 8:
-            ntime_bytes = struct.pack("<I", int(ntime_hex, 16))
-        else:
-            ntime_bytes = bytes.fromhex(ntime_hex)
+            merkle_root = double_sha256(merkle_root + bytes.fromhex(branch_hex))
 
         nonce_val = int(nonce_hex, 16)
-        nonce_bytes = struct.pack("<I", nonce_val)
+        extranonce_raw = (bytes.fromhex(self.extranonce1) + bytes.fromhex(extranonce2)).ljust(16, b"\x00")[:16]
 
-        header_bytes = (
-            struct.pack("<I", self.version)
-            + bytes.fromhex(self.previousblockhash)[::-1]
-            + merkle_root
-            + ntime_bytes
-            + struct.pack("<I", self.bits)
-            + nonce_bytes
-        )
+        self.header_v2.hashMerkleRoot = merkle_root
+        self.header_v2.nNonce = nonce_val
+        self.header_v2.m_extranonce = extranonce_raw
 
-        header_pow_hash = blake2b_256(header_bytes)[::-1]
+        header_164 = self.header_v2.serialize()
+        block_hash = self.header_v2.powhash()[::-1]
 
         total_tx_count = 1 + len(self.raw_transactions)
         block_bytes = (
-            header_bytes
+            header_164
             + varint(total_tx_count)
             + coinbase_bytes
             + b"".join(self.raw_transactions)
         )
-        return block_bytes, header_pow_hash
+        return block_bytes, block_hash
 
 
 class SoloStratumServer:
@@ -478,7 +623,8 @@ class SoloStratumServer:
 def main() -> None:
     import sys
     config_file = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).parent / "config.json")
-    proxy = SoloStratumServer(config_path=config_file)
+    port = int(sys.argv[2]) if len(sys.argv) > 2 else 3333
+    proxy = SoloStratumServer(config_path=config_file, port=port)
     asyncio.run(proxy.start())
 
 

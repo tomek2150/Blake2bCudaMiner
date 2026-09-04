@@ -32,17 +32,13 @@ int main() {
     const int total_tests = 100;
 
     for (uint32_t nonce = 1000; nonce < 1000 + total_tests; ++nonce) {
-        // Prepare CPU header
+        // Prepare CPU header (Bitcoin Knots Profile 0: Nonce at bytes 32..35)
         uint8_t h_copy[80];
         std::memcpy(h_copy, header, 80);
-        h_copy[72] = (uint8_t)test_nbits;
-        h_copy[73] = (uint8_t)(test_nbits >> 8);
-        h_copy[74] = (uint8_t)(test_nbits >> 16);
-        h_copy[75] = (uint8_t)(test_nbits >> 24);
-        h_copy[76] = (uint8_t)nonce;
-        h_copy[77] = (uint8_t)(nonce >> 8);
-        h_copy[78] = (uint8_t)(nonce >> 16);
-        h_copy[79] = (uint8_t)(nonce >> 24);
+        h_copy[32] = (uint8_t)nonce;
+        h_copy[33] = (uint8_t)(nonce >> 8);
+        h_copy[34] = (uint8_t)(nonce >> 16);
+        h_copy[35] = (uint8_t)(nonce >> 24);
 
         // 1. CPU Reference Hash
         uint8_t cpu_hash[32];
@@ -65,7 +61,44 @@ int main() {
 
     std::cout << "  • Tested nonces:    " << total_tests << std::endl;
     std::cout << "  • Passed tests:     " << passed << " / " << total_tests << std::endl;
-    std::cout << "  ✅ ALL 100/100 TESTS PASSED SUCCESSFULLY!" << std::endl;
+
+    // Test Vector: Bitcoin Knots Block 967420
+    std::cout << "\n 📦 VERIFYING LIVE BITCOIN KNOTS BLOCK 967420..." << std::endl;
+    const char* b967420_hex = "000000000000dfd46bfcea946a738250ba3e381a94e0478536ca95ccd9012684fff0985040735a1500000000a99e9a6afdf7ad5c2490beffa266ce42a90f065eabb96dbcf28f06743df358395fa8c80e";
+    uint8_t b967420_msg[80];
+    for (int i = 0; i < 80; ++i) {
+        unsigned int byte_val;
+        sscanf(b967420_hex + i * 2, "%02x", &byte_val);
+        b967420_msg[i] = (uint8_t)byte_val;
+    }
+
+    blake2b_midstate_t b_mid;
+    blake2b_precompute_midstate(b967420_msg, 0x193c2d40, &b_mid);
+    blake2b_set_midstate_cuda(&b_mid);
+
+    uint32_t b_nonce = 1352200447; // 0x5098f0ff
+    uint64_t b_gpu_h[4];
+    blake2b_compute_single_hash_gpu(b_nonce, b_gpu_h);
+
+    uint8_t b_gpu_bytes[32];
+    std::memcpy(b_gpu_bytes, b_gpu_h, 32);
+
+    const char* exp_hash = "000000000000002207d392c9a6cdb2f58918ce26beebfa19def8efe55c021c3f";
+    char got_hash[65];
+    for (int i = 0; i < 32; ++i) {
+        sprintf(got_hash + i * 2, "%02x", b_gpu_bytes[i]);
+    }
+    got_hash[64] = '\0';
+
+    std::cout << "  • Block 967420 Hash: " << got_hash << std::endl;
+    if (std::strcmp(got_hash, exp_hash) == 0) {
+        std::cout << "  ✅ BLOCK 967420 MATCHES NETWORK 100%!" << std::endl;
+    } else {
+        std::cerr << "  ❌ BLOCK 967420 MISMATCH! Expected: " << exp_hash << std::endl;
+        return 1;
+    }
+
+    std::cout << "  ✅ ALL TESTS PASSED SUCCESSFULLY!" << std::endl;
     std::cout << "============================================================" << std::endl;
 
     return 0;

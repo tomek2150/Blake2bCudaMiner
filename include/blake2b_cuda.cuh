@@ -35,9 +35,9 @@ __constant__ const uint64_t BLAKE2B_256_INIT[8] = {
  * Contains working state v[0..15] after Round 0 column step as well as m[0..8] and nBits.
  */
 struct blake2b_midstate_t {
-    uint64_t v[16];      // Precomputed internal working state after R0 column step
-    uint64_t m[9];       // Static message words m[0..8]
-    uint32_t nbits;      // nBits target difficulty
+    uint64_t v[16];      // Precomputed internal working state after R0 column static steps
+    uint64_t m[10];      // Message words m[0..3] and m[5..9] (m[4] high 32-bit holds nonce2)
+    uint32_t nonce2;     // High 32-bit of m[4]
     uint32_t target_hi;  // Highest 32 bits of search target
     uint64_t target64;   // 64-bit compact target for fast preliminary check
 };

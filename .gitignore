@@ -11,3 +11,6 @@ build/
 *.json
 !*.example.json
 !config.example.json
+
+# Scratch and temporary agent files
+_agent_scratch/

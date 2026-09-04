@@ -1,3 +1,6 @@
+All versions prior to v1.3.1 had a bug in the 164-byte Header v2 consensus rule. Please update your clone immediately. Bug is patched and miner is successful tested.
+
+
 # ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner for Bitcoin Knots
 
 `Blake2bCudaMiner` is a highly optimized, lightweight CUDA C++ miner for the **Blake2b PoW algorithm** (Bitcoin Knots Fork), engineered specifically for maximum energy efficiency (**Hash/Watt**) and maximum shader throughput (**Hash/Shader**) across all modern NVIDIA architectures (RTX 20-, 30-, 40-, and 50-series, Ada Lovelace & Blackwell).

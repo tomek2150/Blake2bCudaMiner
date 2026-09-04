@@ -1,5 +1,5 @@
 > [!CAUTION]
-> All versions prior to v1.3.1 had a bug in the 164-byte Header v2 consensus rule. Please update your clone immediately. Bug is patched and miner is successful tested.
+> recent version has 3 bugs. i will patch them today later, have no time now.
 
 
 

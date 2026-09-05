@@ -124,9 +124,15 @@ def encode_bip34_height(height: int) -> bytes:
     if height == 0:
         return b"\x00"
     elif 1 <= height <= 16:
-        return bytes([0x50 + height])
-    raw = height.to_bytes((height.bit_length() + 7) // 8, byteorder="little")
-    return bytes([len(raw)]) + raw
+        return bytes([0x50 + height, 0x00])
+    raw = bytearray()
+    val = height
+    while val > 0:
+        raw.append(val & 0xFF)
+        val >>= 8
+    if raw[-1] & 0x80:
+        raw.append(0)
+    return bytes([len(raw)]) + bytes(raw)
 
 
 def swap32_hex(hex_str: str) -> str:
@@ -277,10 +283,10 @@ class HeaderV2:
     def powhash(self) -> bytes:
         raw = blake2b_256(self.asic_message())
         mask = self.xor_key_mask()
-        return bytes(raw[i] ^ mask[i] for i in range(32))[::-1]
+        return bytes(raw[i] ^ mask[i] for i in range(32))
 
     def block_hash_hex(self) -> str:
-        return self.powhash()[::-1].hex()
+        return self.powhash().hex()
 
 
 class StratumJob:
@@ -311,10 +317,19 @@ class StratumJob:
             else compact_to_target(self.bits)
         )
 
+        DIFF1_TARGET = 0x00000000FFFF0000000000000000000000000000000000000000000000000000
+        self.network_difficulty = DIFF1_TARGET / self.target
+        self.stratum_difficulty = min(16.0, self.network_difficulty)
+
         self.raw_transactions = [
             bytes.fromhex(tx["data"]) for tx in template.get("transactions", [])
         ]
-        self.tx_hashes = [double_sha256(tx) for tx in self.raw_transactions]
+        self.tx_hashes = [
+            bytes.fromhex(tx["txid"])[::-1]
+            if "txid" in tx
+            else double_sha256(bytes.fromhex(tx["data"]))
+            for tx in template.get("transactions", [])
+        ]
 
         self._build_coinbase_parts()
         self.merkle_branches = compute_merkle_branches([b"\x00" * 32] + self.tx_hashes)
@@ -348,7 +363,12 @@ class StratumJob:
 
     def _build_coinbase_parts(self) -> None:
         """Constructs coinb1 and coinb2 parts."""
-        script_prefix = encode_bip34_height(self.height) + b"/SoloBlake2bCudaMiner/"
+        coinbaseaux = self.template.get("coinbaseaux", {})
+        headline_hex = coinbaseaux.get("blake2b_headline", "")
+        headline_raw = bytes.fromhex(headline_hex) if headline_hex else b""
+        headline_push = bytes([len(headline_raw)]) + headline_raw if headline_raw else b""
+
+        script_prefix = encode_bip34_height(self.height) + headline_push
         total_scriptsig_len = (
             len(script_prefix)
             + (len(self.extranonce1) // 2)
@@ -356,7 +376,7 @@ class StratumJob:
         )
 
         tx_in = (
-            struct.pack("<I", 1)
+            struct.pack("<I", 2)
             + varint(1)
             + b"\x00" * 32
             + struct.pack("<I", 0xFFFFFFFF)
@@ -403,33 +423,47 @@ class StratumJob:
 
     def build_full_block(self, extranonce2: str, ntime_hex: str, nonce_hex: str) -> Tuple[bytes, bytes]:
         """Reconstructs the full 164-byte Header v2 and serialized block for Bitcoin Knots."""
-        coinbase_bytes = (
+        coinbase_legacy = (
             bytes.fromhex(self.coinb1)
             + bytes.fromhex(self.extranonce1)
-            + bytes.fromhex(extranonce2)
+            + (b"\x00" * self.extranonce2_size)
             + bytes.fromhex(self.coinb2)
         )
-        coinbase_hash = double_sha256(coinbase_bytes)
+        coinbase_hash = double_sha256(coinbase_legacy)
 
         merkle_root = coinbase_hash
         for branch_hex in self.merkle_branches:
             merkle_root = double_sha256(merkle_root + bytes.fromhex(branch_hex))
 
         nonce_val = int(nonce_hex, 16)
-        extranonce_raw = (bytes.fromhex(self.extranonce1) + bytes.fromhex(extranonce2)).ljust(16, b"\x00")[:16]
+        nonce2_val = int(extranonce2, 16) if extranonce2 else 0
+        extranonce_raw = (bytes.fromhex(self.extranonce1) + (b"\x00" * self.extranonce2_size)).ljust(16, b"\x00")[:16]
 
         self.header_v2.hashMerkleRoot = merkle_root
         self.header_v2.nNonce = nonce_val
+        self.header_v2.m_nonce2 = nonce2_val
         self.header_v2.m_extranonce = extranonce_raw
 
         header_164 = self.header_v2.serialize()
-        block_hash = self.header_v2.powhash()[::-1]
+        block_hash = self.header_v2.powhash()
+
+        if self.template.get("default_witness_commitment"):
+            cb_body = coinbase_legacy[4:-4]
+            coinbase_for_block = (
+                struct.pack("<I", 2)
+                + b"\x00\x01"
+                + cb_body
+                + b"\x01\x20" + (b"\x00" * 32)
+                + struct.pack("<I", 0)
+            )
+        else:
+            coinbase_for_block = coinbase_legacy
 
         total_tx_count = 1 + len(self.raw_transactions)
         block_bytes = (
             header_164
             + varint(total_tx_count)
-            + coinbase_bytes
+            + coinbase_for_block
             + b"".join(self.raw_transactions)
         )
         return block_bytes, block_hash
@@ -499,36 +533,49 @@ class SoloStratumServer:
 
     async def poll_node_loop(self) -> None:
         last_block_hash = ""
+        last_tx_count = -1
+        last_job_time = 0.0
         gbt_params = [{"rules": ["segwit", "blake2b"], "capabilities": ["coinbasevalue", "longpoll"]}]
 
         while self.running:
             try:
                 template = await asyncio.to_thread(self._rpc_call, "getblocktemplate", gbt_params)
-                if template and template.get("previousblockhash") != last_block_hash:
-                    last_block_hash = template["previousblockhash"]
-                    self.job_counter += 1
-                    self.current_job = StratumJob(
-                        str(self.job_counter),
-                        template,
-                        self.coinbase_address,
-                        self.extranonce1,
-                        self.extranonce2_size,
-                    )
-                    logger.info(
-                        "New Block Template! Height: %d | Target: %s | Txs: %d",
-                        self.current_job.height,
-                        hex(self.current_job.target)[:16] + "...",
-                        len(self.current_job.raw_transactions),
-                    )
-                    await self.broadcast_job(self.current_job, clean_jobs=True)
+                now = time.time()
+                if template:
+                    prev_hash = template.get("previousblockhash", "")
+                    tx_count = len(template.get("transactions", []))
+                    is_new_block = (prev_hash != last_block_hash)
+                    is_refresh = (not is_new_block and (tx_count != last_tx_count or (now - last_job_time) >= 15.0))
+
+                    if is_new_block or is_refresh:
+                        last_block_hash = prev_hash
+                        last_tx_count = tx_count
+                        last_job_time = now
+                        self.job_counter += 1
+                        self.current_job = StratumJob(
+                            str(self.job_counter),
+                            template,
+                            self.coinbase_address,
+                            self.extranonce1,
+                            self.extranonce2_size,
+                        )
+                        logger.info(
+                            "%s Height: %d | Target: %s | Txs: %d",
+                            "New Block Template!" if is_new_block else "Refreshed Template:",
+                            self.current_job.height,
+                            hex(self.current_job.target)[:16] + "...",
+                            len(self.current_job.raw_transactions),
+                        )
+                        await self.broadcast_job(self.current_job, clean_jobs=is_new_block)
             except Exception as e:
                 logger.error("Error in GBT polling: %s", e)
 
             await asyncio.sleep(1.0)
 
     async def broadcast_job(self, job: StratumJob, clean_jobs: bool = True) -> None:
+        diff_msg = json.dumps({"id": None, "method": "mining.set_difficulty", "params": [job.stratum_difficulty]}) + "\n"
         msg = json.dumps({"id": None, "method": "mining.notify", "params": job.get_notify_params(clean_jobs)}) + "\n"
-        encoded = msg.encode("utf-8")
+        encoded = (diff_msg + msg).encode("utf-8")
         for writer in list(self.clients):
             try:
                 writer.write(encoded)
@@ -572,8 +619,8 @@ class SoloStratumServer:
                     resp = {"id": msg_id, "result": True, "error": None}
                     writer.write((json.dumps(resp) + "\n").encode("utf-8"))
 
-                    # Stratum difficulty: 16.0
-                    diff_msg = json.dumps({"id": None, "method": "mining.set_difficulty", "params": [16.0]}) + "\n"
+                    diff_val = self.current_job.stratum_difficulty if self.current_job else 16.0
+                    diff_msg = json.dumps({"id": None, "method": "mining.set_difficulty", "params": [diff_val]}) + "\n"
                     writer.write(diff_msg.encode("utf-8"))
                     await writer.drain()
 
@@ -596,7 +643,9 @@ class SoloStratumServer:
                             logger.info("🎉 VALID BLOCK FOUND! Hash: %s", block_hash.hex())
                             sub_res = await asyncio.to_thread(self._rpc_call, "submitblock", [raw_block.hex()])
                             if sub_res is None or sub_res == "":
-                                logger.info("🚀 BLOCK ACCEPTED BY BITCOIN NODE!")
+                                logger.info("🚀 BLOCK ACCEPTED BY BITCOIN NODE! Height: %d", self.current_job.height)
+                            else:
+                                logger.error("⚠️ Node rejected block: %s", sub_res)
 
                 elif method == "mining.extranonce.subscribe":
                     resp = {"id": msg_id, "result": True, "error": None}

@@ -9,6 +9,24 @@ BIN_PATH="${SCRIPT_DIR}/bin/b2bcudaminer"
 CONFIG_FILE="${SCRIPT_DIR}/config.json"
 PROXY_SCRIPT="${SCRIPT_DIR}/solo_stratum_proxy.py"
 
+PROXY_PID=""
+MINER_PID=""
+
+cleanup() {
+    echo ""
+    echo "🛑 Shutting down Blake2bCudaMiner & Stratum Proxy..."
+    if [ -n "${MINER_PID}" ]; then
+        kill "${MINER_PID}" 2>/dev/null || true
+    fi
+    if [ -n "${PROXY_PID}" ]; then
+        kill "${PROXY_PID}" 2>/dev/null || true
+    fi
+    wait 2>/dev/null || true
+    exit 0
+}
+
+trap cleanup EXIT INT TERM
+
 # Build if binary is missing
 if [ ! -f "${BIN_PATH}" ]; then
     echo "⚠️ Miner binary not found. Compiling project..."
@@ -23,12 +41,13 @@ if [ -f "${PROXY_SCRIPT}" ]; then
             exit 1
         fi
     fi
+    # Enforce secure read/write permissions for current user only
+    chmod 600 "${CONFIG_FILE}" 2>/dev/null || true
 
     if ! pgrep -f "solo_stratum_proxy.py" > /dev/null 2>&1; then
         echo "Starting local Solo Stratum Proxy..."
         python3 "${PROXY_SCRIPT}" "${CONFIG_FILE}" &
         PROXY_PID=$!
-        trap "kill ${PROXY_PID} 2>/dev/null || true" EXIT INT TERM
         sleep 1.5
     else
         echo "Solo Stratum Proxy is already active on port 3333."
@@ -37,4 +56,6 @@ fi
 
 # Start Blake2bCudaMiner
 echo "Starting Blake2bCudaMiner..."
-exec "${BIN_PATH}" -o stratum+tcp://127.0.0.1:3333 -u miner -p x "$@"
+"${BIN_PATH}" -o stratum+tcp://127.0.0.1:3333 -u miner -p x "$@" &
+MINER_PID=$!
+wait "${MINER_PID}"

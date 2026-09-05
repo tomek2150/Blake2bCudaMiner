@@ -12,7 +12,7 @@
 #include <cassert>
 
 extern "C" cudaError_t blake2b_set_midstate_cuda(const blake2b_midstate_t* host_midstate);
-extern "C" cudaError_t blake2b_compute_single_hash_gpu(uint32_t nonce, uint64_t out_h[4]);
+extern "C" cudaError_t blake2b_compute_single_hash_gpu(uint64_t full_nonce, uint64_t out_h[4]);
 
 int main() {
     std::cout << "============================================================" << std::endl;
@@ -32,21 +32,27 @@ int main() {
     const int total_tests = 100;
 
     for (uint32_t nonce = 1000; nonce < 1000 + total_tests; ++nonce) {
-        // Prepare CPU header (Bitcoin Knots Profile 0: Nonce at bytes 32..35)
+        uint32_t nonce2 = 0x12340000 + (nonce * 7);
+        // Prepare CPU header (Bitcoin Knots Profile 0: Nonce at bytes 32..35, Nonce2 at bytes 36..39)
         uint8_t h_copy[80];
         std::memcpy(h_copy, header, 80);
         h_copy[32] = (uint8_t)nonce;
         h_copy[33] = (uint8_t)(nonce >> 8);
         h_copy[34] = (uint8_t)(nonce >> 16);
         h_copy[35] = (uint8_t)(nonce >> 24);
+        h_copy[36] = (uint8_t)nonce2;
+        h_copy[37] = (uint8_t)(nonce2 >> 8);
+        h_copy[38] = (uint8_t)(nonce2 >> 16);
+        h_copy[39] = (uint8_t)(nonce2 >> 24);
 
         // 1. CPU Reference Hash
         uint8_t cpu_hash[32];
         blake2b_256_cpu_reference(h_copy, cpu_hash);
 
         // 2. GPU Hash
+        uint64_t full_nonce = ((uint64_t)nonce2 << 32) | nonce;
         uint64_t gpu_h[4];
-        blake2b_compute_single_hash_gpu(nonce, gpu_h);
+        blake2b_compute_single_hash_gpu(full_nonce, gpu_h);
 
         uint8_t gpu_hash[32];
         std::memcpy(gpu_hash, gpu_h, 32);
@@ -77,8 +83,10 @@ int main() {
     blake2b_set_midstate_cuda(&b_mid);
 
     uint32_t b_nonce = 1352200447; // 0x5098f0ff
+    uint32_t b_nonce2 = 358249280; // 0x155a7340
+    uint64_t b_full_nonce = ((uint64_t)b_nonce2 << 32) | b_nonce;
     uint64_t b_gpu_h[4];
-    blake2b_compute_single_hash_gpu(b_nonce, b_gpu_h);
+    blake2b_compute_single_hash_gpu(b_full_nonce, b_gpu_h);
 
     uint8_t b_gpu_bytes[32];
     std::memcpy(b_gpu_bytes, b_gpu_h, 32);

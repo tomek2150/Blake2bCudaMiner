@@ -12,5 +12,6 @@ build/
 !*.example.json
 !config.example.json
 
-# Scratch and temporary agent files
-_agent_scratch/
+# Python bytecode
+__pycache__/
+*.pyc

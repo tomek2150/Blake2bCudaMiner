@@ -16,16 +16,16 @@ __constant__ blake2b_midstate_t d_midstate;
  */
 __global__ __launch_bounds__(512, 2)
 void blake2b_search_kernel(
-    uint32_t start_nonce,
+    uint64_t start_nonce64,
     uint32_t num_nonces,
     uint64_t target_diff,
-    uint32_t* out_found_nonces,
+    uint64_t* out_found_nonces,
     uint32_t* out_count
 ) {
     uint32_t tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid >= num_nonces) return;
 
-    uint32_t nonce = start_nonce + tid;
+    uint64_t full_nonce = start_nonce64 + tid;
 
     // 1. Load precomputed midstate (state after Round 0 column static steps)
     uint64_t v0  = d_midstate.v[0];
@@ -46,7 +46,7 @@ void blake2b_search_kernel(
     uint64_t v15 = d_midstate.v[15];
 
     // 2. Variable message word m4 (Nonce [low 32-bit] + nonce2 [high 32-bit])
-    uint64_t m4 = ((uint64_t)d_midstate.nonce2 << 32) | (uint64_t)nonce;
+    uint64_t m4 = full_nonce;
 
     /* =====================================================================
      * Round 0: Complete Column 2 and Diagonal steps on GPU
@@ -216,7 +216,7 @@ void blake2b_search_kernel(
     if (h0_be <= target_diff) {
         uint32_t idx = atomicAdd(out_count, 1);
         if (idx < MAX_FOUND_NONCES) {
-            out_found_nonces[idx] = nonce;
+            out_found_nonces[idx] = full_nonce;
         }
     }
 }
@@ -232,17 +232,17 @@ extern "C" cudaError_t blake2b_set_midstate_cuda(const blake2b_midstate_t* host_
  * @brief Launches optimized Blake2b search kernel.
  */
 extern "C" cudaError_t blake2b_launch_kernel(
-    uint32_t start_nonce,
+    uint64_t start_nonce64,
     uint32_t num_nonces,
     uint64_t target_diff,
-    uint32_t* d_found_nonces,
+    uint64_t* d_found_nonces,
     uint32_t* d_found_count,
     uint32_t block_size,
     cudaStream_t stream
 ) {
     uint32_t grid_size = (num_nonces + block_size - 1) / block_size;
     blake2b_search_kernel<<<grid_size, block_size, 0, stream>>>(
-        start_nonce,
+        start_nonce64,
         num_nonces,
         target_diff,
         d_found_nonces,
@@ -254,7 +254,7 @@ extern "C" cudaError_t blake2b_launch_kernel(
 /**
  * @brief Kernel for single hash calculation (for verification tests).
  */
-__global__ void blake2b_single_hash_kernel(uint32_t nonce, uint64_t* out_h) {
+__global__ void blake2b_single_hash_kernel(uint64_t full_nonce, uint64_t* out_h) {
     uint64_t v0  = d_midstate.v[0];
     uint64_t v1  = d_midstate.v[1];
     uint64_t v2  = d_midstate.v[2];
@@ -272,7 +272,7 @@ __global__ void blake2b_single_hash_kernel(uint32_t nonce, uint64_t* out_h) {
     uint64_t v14 = d_midstate.v[14];
     uint64_t v15 = d_midstate.v[15];
 
-    uint64_t m4 = ((uint64_t)d_midstate.nonce2 << 32) | (uint64_t)nonce;
+    uint64_t m4 = full_nonce;
 
     /* =====================================================================
      * Round 0: Complete Column 2 and Diagonal steps on GPU
@@ -432,10 +432,10 @@ __global__ void blake2b_single_hash_kernel(uint32_t nonce, uint64_t* out_h) {
     out_h[3] = xor3_b64(BLAKE2B_256_INIT[3], v3, v11);
 }
 
-extern "C" cudaError_t blake2b_compute_single_hash_gpu(uint32_t nonce, uint64_t out_h[4]) {
+extern "C" cudaError_t blake2b_compute_single_hash_gpu(uint64_t full_nonce, uint64_t out_h[4]) {
     uint64_t* d_h;
     cudaMalloc(&d_h, 4 * sizeof(uint64_t));
-    blake2b_single_hash_kernel<<<1, 1>>>(nonce, d_h);
+    blake2b_single_hash_kernel<<<1, 1>>>(full_nonce, d_h);
     cudaDeviceSynchronize();
     cudaMemcpy(out_h, d_h, 4 * sizeof(uint64_t), cudaMemcpyDeviceToHost);
     cudaFree(d_h);

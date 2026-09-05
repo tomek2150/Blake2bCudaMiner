@@ -1,6 +1,6 @@
 {
   "algo": "blake2b",
-  "url": "http://127.0.0.1:38332",
+  "url": "http://127.0.0.1:8332",
   "user": "YOUR_RPC_USERNAME",
   "pass": "YOUR_RPC_PASSWORD",
   "coinbase-addr": "YOUR_BITCOIN_PAYOUT_ADDRESS"

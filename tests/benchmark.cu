@@ -13,16 +13,16 @@
 
 extern "C" cudaError_t blake2b_set_midstate_cuda(const blake2b_midstate_t* host_midstate);
 extern "C" cudaError_t blake2b_launch_kernel(
-    uint32_t start_nonce,
+    uint64_t start_nonce64,
     uint32_t num_nonces,
     uint64_t target_diff,
-    uint32_t* d_found_nonces,
+    uint64_t* d_found_nonces,
     uint32_t* d_found_count,
     uint32_t block_size,
     cudaStream_t stream
 );
 
-void run_benchmark_for_block_size(uint32_t block_size, uint32_t* d_found, uint32_t* d_cnt) {
+void run_benchmark_for_block_size(uint32_t block_size, uint64_t* d_found, uint32_t* d_cnt) {
     const uint32_t batch_size = 64 * 1024 * 1024; // 67,108,864 nonces
     const int iterations = 5;
 
@@ -38,7 +38,7 @@ void run_benchmark_for_block_size(uint32_t block_size, uint32_t* d_found, uint32
     float min_ms = 99999.0f;
 
     for (int i = 0; i < iterations; ++i) {
-        uint32_t start_nonce = i * batch_size;
+        uint64_t start_nonce = (uint64_t)i * batch_size;
         cudaEventRecord(start);
         blake2b_launch_kernel(start_nonce, batch_size, 0x0000000000000000ULL, d_found, d_cnt, block_size, 0);
         cudaEventRecord(stop);
@@ -70,9 +70,9 @@ void run_pipelining_benchmark(uint32_t block_size) {
               << total_nonces / 1000000 << "M nonces, block size " << block_size << "):" << std::endl;
 
     // 1. Synchronous Single-Stream Baseline
-    uint32_t* d_found_nonces;
+    uint64_t* d_found_nonces;
     uint32_t* d_found_count;
-    cudaMalloc(&d_found_nonces, 16 * sizeof(uint32_t));
+    cudaMalloc(&d_found_nonces, 16 * sizeof(uint64_t));
     cudaMalloc(&d_found_count, sizeof(uint32_t));
     uint32_t sync_count = 0;
 
@@ -83,7 +83,7 @@ void run_pipelining_benchmark(uint32_t block_size) {
     auto t_sync_start = std::chrono::high_resolution_clock::now();
     for (int b = 0; b < total_batches; ++b) {
         cudaMemset(d_found_count, 0, sizeof(uint32_t));
-        blake2b_launch_kernel((uint32_t)b * batch_size, batch_size, 0ULL, d_found_nonces, d_found_count, block_size, 0);
+        blake2b_launch_kernel((uint64_t)b * batch_size, batch_size, 0ULL, d_found_nonces, d_found_count, block_size, 0);
         cudaDeviceSynchronize();
         cudaMemcpy(&sync_count, d_found_count, sizeof(uint32_t), cudaMemcpyDeviceToHost);
     }
@@ -96,16 +96,16 @@ void run_pipelining_benchmark(uint32_t block_size) {
 
     // 2. Asynchronous Dual-Stream (Double-Buffering)
     cudaStream_t streams[2];
-    uint32_t* d_nonces[2];
+    uint64_t* d_nonces[2];
     uint32_t* d_count[2];
     uint32_t* h_count[2];
-    uint32_t* h_nonces[2];
+    uint64_t* h_nonces[2];
 
     for (int i = 0; i < 2; ++i) {
         cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking);
-        cudaMalloc(&d_nonces[i], 16 * sizeof(uint32_t));
+        cudaMalloc(&d_nonces[i], 16 * sizeof(uint64_t));
         cudaMalloc(&d_count[i], sizeof(uint32_t));
-        cudaMallocHost(&h_nonces[i], 16 * sizeof(uint32_t));
+        cudaMallocHost(&h_nonces[i], 16 * sizeof(uint64_t));
         cudaMallocHost(&h_count[i], sizeof(uint32_t));
     }
 
@@ -120,7 +120,7 @@ void run_pipelining_benchmark(uint32_t block_size) {
         }
 
         cudaMemsetAsync(d_count[active], 0, sizeof(uint32_t), streams[active]);
-        blake2b_launch_kernel((uint32_t)b * batch_size, batch_size, 0ULL, d_nonces[active], d_count[active], block_size, streams[active]);
+        blake2b_launch_kernel((uint64_t)b * batch_size, batch_size, 0ULL, d_nonces[active], d_count[active], block_size, streams[active]);
         cudaMemcpyAsync(h_count[active], d_count[active], sizeof(uint32_t), cudaMemcpyDeviceToHost, streams[active]);
         in_flight[active] = true;
 
@@ -177,9 +177,9 @@ int main() {
     blake2b_precompute_midstate(test_header, test_nbits, &midstate);
     blake2b_set_midstate_cuda(&midstate);
 
-    uint32_t* d_found_nonces;
+    uint64_t* d_found_nonces;
     uint32_t* d_found_count;
-    cudaMalloc(&d_found_nonces, 16 * sizeof(uint32_t));
+    cudaMalloc(&d_found_nonces, 16 * sizeof(uint64_t));
     cudaMalloc(&d_found_count, sizeof(uint32_t));
     cudaMemset(d_found_count, 0, sizeof(uint32_t));
 

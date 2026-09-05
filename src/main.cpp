@@ -16,10 +16,10 @@
 
 extern "C" cudaError_t blake2b_set_midstate_cuda(const blake2b_midstate_t* host_midstate);
 extern "C" cudaError_t blake2b_launch_kernel(
-    uint32_t start_nonce,
+    uint64_t start_nonce,
     uint32_t num_nonces,
     uint64_t target_diff,
-    uint32_t* d_found_nonces,
+    uint64_t* d_found_nonces,
     uint32_t* d_found_count,
     uint32_t block_size,
     cudaStream_t stream
@@ -93,7 +93,7 @@ void print_help(const char* prog_name) {
 
       )ASCII" << "\n";
     std::cout << "================================================================================\n";
-    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.3.1\n";
+    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.3.2\n";
     std::cout << "================================================================================\n";
     std::cout << "Usage: " << prog_name << " [OPTIONS]\n\n";
     std::cout << "Options:\n";
@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
     }
 
     std::cout << "=================================================================" << std::endl;
-    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.3.1" << std::endl;
+    std::cout << " ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner v1.3.2" << std::endl;
     std::cout << "=================================================================" << std::endl;
 
     cudaSetDevice(device_id);
@@ -167,9 +167,9 @@ int main(int argc, char** argv) {
     // Multi-Stream Double-Buffering Context
     struct StreamSlot {
         cudaStream_t stream;
-        uint32_t* d_found_nonces;
+        uint64_t* d_found_nonces;
         uint32_t* d_found_count;
-        uint32_t* h_found_nonces; // Pinned host memory
+        uint64_t* h_found_nonces; // Pinned host memory
         uint32_t* h_found_count;  // Pinned host memory
         bool in_flight;
         uint32_t batch_size;
@@ -180,9 +180,9 @@ int main(int argc, char** argv) {
     StreamSlot slots[2];
     for (int i = 0; i < 2; ++i) {
         cudaStreamCreateWithFlags(&slots[i].stream, cudaStreamNonBlocking);
-        cudaMalloc(&slots[i].d_found_nonces, 16 * sizeof(uint32_t));
+        cudaMalloc(&slots[i].d_found_nonces, 16 * sizeof(uint64_t));
         cudaMalloc(&slots[i].d_found_count, sizeof(uint32_t));
-        cudaMallocHost(&slots[i].h_found_nonces, 16 * sizeof(uint32_t));
+        cudaMallocHost(&slots[i].h_found_nonces, 16 * sizeof(uint64_t));
         cudaMallocHost(&slots[i].h_found_count, sizeof(uint32_t));
         slots[i].in_flight = false;
         slots[i].batch_size = 0;
@@ -226,7 +226,7 @@ int main(int argc, char** argv) {
     std::cout << "  ✅ Stratum connected! Waiting for first block template..." << std::endl;
 
     const uint32_t batch_size = 64 * 1024 * 1024; // 67,108,864 nonces per launch
-    uint32_t nonce_counter = 0;
+    uint64_t nonce_counter = 0;
     int cur_slot = 0;
     auto last_stats_time = std::chrono::steady_clock::now();
     uint64_t last_hash_count = 0;
@@ -248,7 +248,12 @@ int main(int argc, char** argv) {
                     if (cnt > 0) {
                         if (cnt > 16) cnt = 16;
                         for (uint32_t k = 0; k < cnt; ++k) {
-                            stratum.submit_share(slots[i].job_id, "00000000", slots[i].ntime, slots[i].h_found_nonces[k]);
+                            uint64_t found = slots[i].h_found_nonces[k];
+                            uint32_t found_nonce = (uint32_t)found;
+                            uint32_t found_nonce2 = (uint32_t)(found >> 32);
+                            char xn2_str[16];
+                            snprintf(xn2_str, sizeof(xn2_str), "%08x", found_nonce2);
+                            stratum.submit_share(slots[i].job_id, xn2_str, slots[i].ntime, found_nonce);
                         }
                     }
                     total_hashes += slots[i].batch_size;
@@ -273,7 +278,12 @@ int main(int argc, char** argv) {
             if (cnt > 0) {
                 if (cnt > 16) cnt = 16;
                 for (uint32_t k = 0; k < cnt; ++k) {
-                    stratum.submit_share(slots[cur_slot].job_id, "00000000", slots[cur_slot].ntime, slots[cur_slot].h_found_nonces[k]);
+                    uint64_t found = slots[cur_slot].h_found_nonces[k];
+                    uint32_t found_nonce = (uint32_t)found;
+                    uint32_t found_nonce2 = (uint32_t)(found >> 32);
+                    char xn2_str[16];
+                    snprintf(xn2_str, sizeof(xn2_str), "%08x", found_nonce2);
+                    stratum.submit_share(slots[cur_slot].job_id, xn2_str, slots[cur_slot].ntime, found_nonce);
                 }
             }
             total_hashes += slots[cur_slot].batch_size;
@@ -296,7 +306,7 @@ int main(int argc, char** argv) {
             slots[cur_slot].stream
         );
         cudaMemcpyAsync(slots[cur_slot].h_found_count, slots[cur_slot].d_found_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, slots[cur_slot].stream);
-        cudaMemcpyAsync(slots[cur_slot].h_found_nonces, slots[cur_slot].d_found_nonces, 16 * sizeof(uint32_t), cudaMemcpyDeviceToHost, slots[cur_slot].stream);
+        cudaMemcpyAsync(slots[cur_slot].h_found_nonces, slots[cur_slot].d_found_nonces, 16 * sizeof(uint64_t), cudaMemcpyDeviceToHost, slots[cur_slot].stream);
         slots[cur_slot].in_flight = true;
 
         nonce_counter += batch_size;

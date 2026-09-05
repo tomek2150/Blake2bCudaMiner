@@ -1,5 +1,5 @@
-> [!CAUTION]
-> All versions prior to v1.3.1 had a bug in the 164-byte Header v2 consensus rule. Please update your clone immediately. Bug is patched and miner is successful tested.
+> [!NOTE]
+> **Blake2bCudaMiner v1.3.2:** Fully aligned with the 164-byte Header v2 consensus rule (BIP-110). Includes full 64-bit nonce space expansion (`nNonce` + `m_nonce2`), periodic mempool and time refreshing, and zero-idle asynchronous dual-stream double buffering. Verified 100% against official test vectors and live Mainnet Block 967420.
 
 
 
@@ -78,60 +78,193 @@ graph TD
 
 ---
 
-## 🛠️ Installation & Build Guide
+## 🛠️ Installation & Setup Guide
 
-### Prerequisites (Linux / WSL)
-* NVIDIA CUDA Toolkit 12+ (`nvcc`)
-* GCC / G++ with C++17 support
-* OpenSSL development headers (`libssl-dev`)
+`Blake2bCudaMiner` is designed to run seamlessly in two distinct environments:
+1. **Option A: Pure Native Linux (Recommended for dedicated mining rigs / servers)** – Node, Solo Proxy, and GPU Miner all run natively on Linux.
+2. **Option B: Hybrid Setup (Windows Desktop with WSL2)** – Bitcoin Knots runs natively on Windows (GUI or daemon), while the GPU Miner and Solo Proxy run inside WSL2 with CUDA acceleration.
 
+---
+
+### Prerequisites
+
+| Requirement | Pure Linux (Ubuntu / Debian) | Windows + WSL2 |
+| :--- | :--- | :--- |
+| **Operating System** | Ubuntu 22.04 / 24.04 LTS or Debian 12 | Windows 10/11 with WSL2 (Ubuntu) |
+| **NVIDIA Driver** | Latest NVIDIA Linux Driver (`>= 535`) | Latest NVIDIA Windows Driver (CUDA in WSL is paravirtualized automatically) |
+| **CUDA Toolkit** | CUDA 12+ (`sudo apt install nvidia-cuda-toolkit`) | CUDA 12+ installed inside WSL2 |
+| **Build Tools** | `build-essential` (GCC 11+ with C++17 support) | `build-essential` inside WSL2 |
+| **Libraries** | OpenSSL headers (`libssl-dev`), Python 3 | `libssl-dev`, `python3` inside WSL2 |
+
+Install all required build tools and libraries with a single command:
 ```bash
-# 1. Install dependencies (Ubuntu / Debian / WSL)
 sudo apt update
-sudo apt install -y build-essential nvidia-cuda-toolkit libssl-dev
+sudo apt install -y build-essential nvidia-cuda-toolkit libssl-dev python3 git
+```
 
-# 2. Clone the repository and compile
+---
+
+### Setup Path 1: Pure Native Linux (All-in-One Rig)
+
+In this configuration, your Bitcoin Knots node (`bitcoind`) runs on the same machine as the miner.
+
+#### Step 1: Configure Bitcoin Knots (`bitcoin.conf`)
+Open or create `~/.bitcoin/bitcoin.conf` on your Linux machine:
+```ini
+# Core settings
+server=1
+daemon=1
+txindex=1
+
+# RPC credentials
+rpcuser=miner
+rpcpassword=YourSuperSecurePassword123
+
+# Bind RPC locally
+rpcallowip=127.0.0.1
+rpcbind=127.0.0.1
+rpcport=8332
+```
+
+#### Step 2: Clone and Build Blake2bCudaMiner
+```bash
 git clone https://github.com/tomek2150/Blake2bCudaMiner.git
 cd Blake2bCudaMiner
 make all
+```
+
+#### Step 3: Configure `config.json` & Set Secure Permissions
+Copy the template and configure your credentials:
+```bash
+cp config.example.json config.json
+```
+Edit `config.json` with your favorite editor:
+```json
+{
+  "algo": "blake2b",
+  "url": "http://127.0.0.1:8332",
+  "user": "miner",
+  "pass": "YourSuperSecurePassword123",
+  "coinbase-addr": "bc1q_your_payout_address_here"
+}
+```
+
+> [!SECURITY]
+> **Protect your RPC credentials!**
+> Because `config.json` contains your node's RPC password, restrict file permissions so only your user account can read it:
+> ```bash
+> chmod 600 config.json
+> chmod +x start.sh
+> ```
+
+#### Step 4: Run the Miner
+```bash
+./start.sh
+```
+`start.sh` automatically launches the local `solo_stratum_proxy.py`, connects to `bitcoind` at `127.0.0.1:8332`, and launches the optimized CUDA miner on your GPU.
+
+---
+
+### Setup Path 2: Hybrid Setup (Bitcoin Knots on Windows + Miner in WSL2)
+
+In this configuration, Bitcoin Knots runs natively on Windows (e.g., using `K:\bitcoinknots` or standard `%APPDATA%\Bitcoin`), while the GPU miner runs inside WSL2 for native Linux CUDA compilation.
+
+#### Step 1: Configure Bitcoin Knots on Windows (`bitcoin.conf`)
+Because WSL2 operates inside an isolated Hyper-V virtual network (`172.x.x.x`), your Windows node must permit RPC connections from the WSL2 virtual subnet.
+
+Locate or create `bitcoin.conf` in your Bitcoin data directory on Windows (usually `C:\Users\<Username>\AppData\Roaming\Bitcoin\bitcoin.conf`):
+```ini
+server=1
+txindex=1
+
+# RPC credentials
+rpcuser=miner
+rpcpassword=YourSuperSecurePassword123
+
+# Allow local loopback and WSL2 virtual network subnet
+rpcallowip=127.0.0.1
+rpcallowip=172.16.0.0/12
+rpcbind=0.0.0.0
+rpcport=8332
+```
+
+#### Step 2: Allow WSL2 RPC in Windows Firewall (PowerShell as Admin)
+By default, Windows Firewall blocks incoming connections from the Hyper-V virtual network. Run this in **PowerShell (Administrator)** on Windows to allow the RPC port:
+```powershell
+# For Mainnet (Port 8332):
+New-NetFirewallRule -DisplayName "Bitcoin Knots Mainnet RPC for WSL" -Direction Inbound -LocalPort 8332 -Protocol TCP -Action Allow -RemoteAddress 172.16.0.0/12
+```
+Restart your Bitcoin Knots node on Windows.
+
+#### Step 3: Install and Build inside WSL2
+Open your WSL2 terminal (e.g. Ubuntu terminal) on Windows:
+```bash
+sudo apt update
+sudo apt install -y build-essential nvidia-cuda-toolkit libssl-dev python3 git
+
+git clone https://github.com/tomek2150/Blake2bCudaMiner.git
+cd Blake2bCudaMiner
+make all
+```
+
+#### Step 4: Configure `config.json` inside WSL2
+```bash
+cp config.example.json config.json
+chmod 600 config.json
+chmod +x start.sh
+```
+In `config.json`, simply leave the URL as `"http://127.0.0.1:8332"`:
+```json
+{
+  "algo": "blake2b",
+  "url": "http://127.0.0.1:8332",
+  "user": "miner",
+  "pass": "YourSuperSecurePassword123",
+  "coinbase-addr": "bc1q_your_payout_address_here"
+}
+```
+
+> [!TIP]
+> **Built-in WSL Auto-Routing:**
+> `solo_stratum_proxy.py` contains built-in routing detection. When running inside WSL2, it automatically inspects `/proc/net/route` and translates `127.0.0.1` to your Windows host's gateway IP (e.g. `172.23.64.1`) without any manual IP configuration!
+
+#### Step 5: Run the Miner in WSL2
+```bash
+./start.sh
 ```
 
 ---
 
 ## 🧪 Tests & Verification
 
+Before running in production, verify mathematical consensus accuracy and GPU performance:
+
 ```bash
-# 1. Automated correctness test (100 nonces CPU vs GPU + Live Bitcoin Knots Block 967420 verification)
+# 1. Automated unit test suite:
+#    Verifies 100/100 nonces CPU vs GPU and validates against live Mainnet Block 967420
 ./bin/test_correctness
 
-# 2. Throughput & block-size parameter benchmark
+# 2. Benchmark GPU throughput & thread-block occupancy
 ./bin/benchmark
 ```
 
 ---
 
-## ⛏️ Running the Miner
+## ⛏️ Advanced CLI Execution
 
-### Option A: Using the All-in-One Startup Script (Recommended)
-Copy `config.example.json` to `config.json` and configure your credentials:
+If you run a dedicated Stratum pool (or already have `solo_stratum_proxy.py` running in another terminal/service), you can launch the miner binary directly:
 
 ```bash
-cp config.example.json config.json
-./start.sh
+./bin/b2bcudaminer -o stratum+tcp://127.0.0.1:3333 -u miner -p x -b 512
 ```
 
-### Option B: Direct CLI Execution
-```bash
-./bin/b2bcudaminer -o stratum+tcp://127.0.0.1:3333 -u miner -p x
-```
-
-#### CLI Options:
-* `-o, --url <url>` : Stratum server URL (Default: `127.0.0.1:3333`)
-* `-u, --user <username>` : Mining username or payout address (Default: `miner`)
-* `-p, --pass <password>` : Mining password (Default: `x`)
-* `-d, --device <id>` : CUDA Device ID (Default: `0`)
-* `-b, --block-size <n>` : Threads per CUDA block (Default: `512`)
-* `-h, --help` : Display help message and options
+#### Command-Line Arguments:
+* `-o, --url <url>` : Stratum server address (Default: `127.0.0.1:3333`)
+* `-u, --user <username>` : Stratum username / worker ID (Default: `miner`)
+* `-p, --pass <password>` : Stratum password (Default: `x`)
+* `-d, --device <id>` : CUDA device ID to use (Default: `0`)
+* `-b, --block-size <n>` : Threads per CUDA block: `[64, 128, 256, 512]` (Default: `512`)
+* `-h, --help` : Display interactive ASCII help screen
 
 ---
 

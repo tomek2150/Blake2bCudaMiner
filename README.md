@@ -1,6 +1,5 @@
 > [!NOTE]
-> **Blake2bCudaMiner v1.3.2:** Fully aligned with the 164-byte Header v2 consensus rule (BIP-110). Includes full 64-bit nonce space expansion (`nNonce` + `m_nonce2`), periodic mempool and time refreshing, and zero-idle asynchronous dual-stream double buffering. Verified 100% against official test vectors and live Mainnet Block 967420.
-
+all previous releases before v1.3.2 had some bugs, that were fixed now. Please update to the newest version.
 
 
 # ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner for Bitcoin Knots

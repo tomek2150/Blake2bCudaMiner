@@ -116,6 +116,10 @@ server=1
 daemon=1
 txindex=1
 
+# Dedicated Blake2b ports (avoids collision with standard Bitcoin Core)
+port=8334
+rpcport=38332
+
 # RPC credentials
 rpcuser=miner
 rpcpassword=YourSuperSecurePassword123
@@ -123,7 +127,6 @@ rpcpassword=YourSuperSecurePassword123
 # Bind RPC locally
 rpcallowip=127.0.0.1
 rpcbind=127.0.0.1
-rpcport=8332
 ```
 
 #### Step 2: Clone and Build Blake2bCudaMiner
@@ -142,7 +145,7 @@ Edit `config.json` with your favorite editor:
 ```json
 {
   "algo": "blake2b",
-  "url": "http://127.0.0.1:8332",
+  "url": "http://127.0.0.1:38332",
   "user": "miner",
   "pass": "YourSuperSecurePassword123",
   "coinbase-addr": "bc1q_your_payout_address_here"
@@ -161,7 +164,7 @@ Edit `config.json` with your favorite editor:
 ```bash
 ./start.sh
 ```
-`start.sh` automatically launches the local `solo_stratum_proxy.py`, connects to `bitcoind` at `127.0.0.1:8332`, and launches the optimized CUDA miner on your GPU.
+`start.sh` automatically launches the local `solo_stratum_proxy.py`, connects to `bitcoind` at `127.0.0.1:38332`, and launches the optimized CUDA miner on your GPU.
 
 ---
 
@@ -177,6 +180,10 @@ Locate or create `bitcoin.conf` in your Bitcoin data directory on Windows (usual
 server=1
 txindex=1
 
+# Dedicated Blake2b ports (avoids collision with standard Bitcoin Core)
+port=8334
+rpcport=38332
+
 # RPC credentials
 rpcuser=miner
 rpcpassword=YourSuperSecurePassword123
@@ -185,14 +192,12 @@ rpcpassword=YourSuperSecurePassword123
 rpcallowip=127.0.0.1
 rpcallowip=172.16.0.0/12
 rpcbind=0.0.0.0
-rpcport=8332
 ```
 
 #### Step 2: Allow WSL2 RPC in Windows Firewall (PowerShell as Admin)
 By default, Windows Firewall blocks incoming connections from the Hyper-V virtual network. Run this in **PowerShell (Administrator)** on Windows to allow the RPC port:
 ```powershell
-# For Mainnet (Port 8332):
-New-NetFirewallRule -DisplayName "Bitcoin Knots Mainnet RPC for WSL" -Direction Inbound -LocalPort 8332 -Protocol TCP -Action Allow -RemoteAddress 172.16.0.0/12
+New-NetFirewallRule -DisplayName "Bitcoin Knots RPC for WSL" -Direction Inbound -LocalPort 38332 -Protocol TCP -Action Allow -RemoteAddress 172.16.0.0/12
 ```
 Restart your Bitcoin Knots node on Windows.
 
@@ -213,11 +218,11 @@ cp config.example.json config.json
 chmod 600 config.json
 chmod +x start.sh
 ```
-In `config.json`, simply leave the URL as `"http://127.0.0.1:8332"`:
+In `config.json`, simply leave the URL as `"http://127.0.0.1:38332"`:
 ```json
 {
   "algo": "blake2b",
-  "url": "http://127.0.0.1:8332",
+  "url": "http://127.0.0.1:38332",
   "user": "miner",
   "pass": "YourSuperSecurePassword123",
   "coinbase-addr": "bc1q_your_payout_address_here"

@@ -1,6 +1,12 @@
 > [!NOTE]
 > all previous releases before v1.3.2 had some bugs, that were fixed now. Please update to the newest version.
-> There are no hidden fees programmed into the code. What you mine belongs to you. I spent several days coding this miner, so I would still appreciate a donation if you use it :-)
+
+> [!NOTE] 
+> There are no hidden fees programmed into the code. What you mine belongs to you. I spent several days coding this miner, so I would appreciate a donation if you use it :-)  
+> the power is with us bitcoiners ;-)
+>
+> bc1qq39udmr430qft85r0hvngcuchzc2xujuym0w67 (sha256 chain)  
+> bc1q3kqkcx9vdnnrg94d4yze3ds2vm722rr3xrk3f0 (blake2b chain)
 
 
 # ⚡ Blake2bCudaMiner: High-Efficiency Blake2b GPU Miner for Bitcoin Knots

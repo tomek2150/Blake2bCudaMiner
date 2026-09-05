@@ -3,5 +3,6 @@
   "url": "http://127.0.0.1:38332",
   "user": "YOUR_RPC_USERNAME",
   "pass": "YOUR_RPC_PASSWORD",
-  "coinbase-addr": "YOUR_BITCOIN_PAYOUT_ADDRESS"
-}
+  "coinbase-addr": "YOUR_BITCOIN_PAYOUT_ADDRESS",
+  "coinbase-sig": "your-miner-tag"
+}

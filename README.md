@@ -148,7 +148,8 @@ Edit `config.json` with your favorite editor:
   "url": "http://127.0.0.1:38332",
   "user": "miner",
   "pass": "YourSuperSecurePassword123",
-  "coinbase-addr": "bc1q_your_payout_address_here"
+  "coinbase-addr": "bc1q_your_payout_address_here",
+  "coinbase-sig": "your-miner-tag"
 }
 ```
 
@@ -225,7 +226,8 @@ In `config.json`, simply leave the URL as `"http://127.0.0.1:38332"`:
   "url": "http://127.0.0.1:38332",
   "user": "miner",
   "pass": "YourSuperSecurePassword123",
-  "coinbase-addr": "bc1q_your_payout_address_here"
+  "coinbase-addr": "bc1q_your_payout_address_here",
+  "coinbase-sig": "your-miner-tag"
 }
 ```
 

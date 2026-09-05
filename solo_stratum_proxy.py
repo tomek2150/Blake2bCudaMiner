@@ -299,12 +299,14 @@ class StratumJob:
         coinbase_address: str,
         extranonce1: str,
         extranonce2_size: int = 4,
+        coinbase_sig: str = "",
     ):
         self.job_id = job_id
         self.template = template
         self.coinbase_address = coinbase_address
         self.extranonce1 = extranonce1
         self.extranonce2_size = extranonce2_size
+        self.coinbase_sig = coinbase_sig
 
         self.height = template["height"]
         self.version = template["version"]
@@ -368,7 +370,10 @@ class StratumJob:
         headline_raw = bytes.fromhex(headline_hex) if headline_hex else b""
         headline_push = bytes([len(headline_raw)]) + headline_raw if headline_raw else b""
 
-        script_prefix = encode_bip34_height(self.height) + headline_push
+        sig_raw = self.coinbase_sig.encode("utf-8")[:32] if self.coinbase_sig else b""
+        sig_push = bytes([len(sig_raw)]) + sig_raw if sig_raw else b""
+
+        script_prefix = encode_bip34_height(self.height) + headline_push + sig_push
         total_scriptsig_len = (
             len(script_prefix)
             + (len(self.extranonce1) // 2)
@@ -480,6 +485,7 @@ class SoloStratumServer:
         self.rpc_user = ""
         self.rpc_pass = ""
         self.coinbase_address = ""
+        self.coinbase_sig = ""
 
         self._load_config()
 
@@ -501,6 +507,7 @@ class SoloStratumServer:
         self.rpc_user = data["user"]
         self.rpc_pass = data["pass"]
         self.coinbase_address = data.get("coinbase-addr") or data.get("coinbase_addr")
+        self.coinbase_sig = data.get("coinbase-sig") or data.get("coinbase_sig") or ""
 
         wsl_host_ip = get_wsl_host_ip()
         if ("127.0.0.1" in raw_url or "localhost" in raw_url) and wsl_host_ip != "127.0.0.1":
@@ -558,6 +565,7 @@ class SoloStratumServer:
                             self.coinbase_address,
                             self.extranonce1,
                             self.extranonce2_size,
+                            coinbase_sig=self.coinbase_sig,
                         )
                         logger.info(
                             "%s Height: %d | Target: %s | Txs: %d",

@@ -14,9 +14,10 @@ if [ ! -d "$GATEWAY_DIR" ] && [ -d "$HOME/ratum" ]; then
 elif [ ! -d "$GATEWAY_DIR" ] && [ -d "$HOME/test/ratum" ]; then
     GATEWAY_DIR="$HOME/test/ratum"
 fi
-GATEWAY_CONFIG="$GATEWAY_DIR/datum_gateway_config.json"
-if [ ! -f "$GATEWAY_CONFIG" ] && [ -f "$SCRIPT_DIR/datum_gateway_config.json" ]; then
-    GATEWAY_CONFIG="$SCRIPT_DIR/datum_gateway_config.json"
+# Config file: look in miner root directory first (alongside datum_gateway_config.example.json)
+GATEWAY_CONFIG="$SCRIPT_DIR/datum_gateway_config.json"
+if [ ! -f "$GATEWAY_CONFIG" ] && [ -f "$GATEWAY_DIR/datum_gateway_config.json" ]; then
+    GATEWAY_CONFIG="$GATEWAY_DIR/datum_gateway_config.json"
 fi
 GATEWAY_BIN="$GATEWAY_DIR/target/release/ratum-gateway"
 MINER_BIN="$SCRIPT_DIR/bin/b2bcudaminer"
@@ -34,6 +35,15 @@ if [ -z "$ADDRESS" ]; then
     echo "================================================================="
     echo " ⚡ Blake2bCudaMiner: Ratum Pool All-in-One Launcher"
     echo "================================================================="
+    if [ ! -f "$GATEWAY_CONFIG" ]; then
+        echo "  [ERROR] Configuration not found: $GATEWAY_CONFIG"
+        echo "  Please copy the template and configure your credentials:"
+        echo "    cp datum_gateway_config.example.json datum_gateway_config.json"
+        echo "    chmod 600 datum_gateway_config.json"
+        echo "    nano datum_gateway_config.json"
+        echo "================================================================="
+        exit 1
+    fi
     echo "Usage: $0 [BITCOIN_ADDRESS.WORKER] [EXTRA_MINER_OPTIONS]"
     echo ""
     echo "Example:"

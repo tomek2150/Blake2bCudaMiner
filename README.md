@@ -40,13 +40,14 @@ cd ..
 ```
 *(If you encounter `cargo: command not found`, run: `source "$HOME/.cargo/env"` or install Rust via step 1).*
 
-Copy the example configuration to `ratum/datum_gateway_config.json` and enter your node RPC credentials and payout address:
+Copy the example configuration to `datum_gateway_config.json` and enter your node RPC credentials and payout address:
 ```bash
-cp datum_gateway_config.example.json ratum/datum_gateway_config.json
-nano ratum/datum_gateway_config.json
+cp datum_gateway_config.example.json datum_gateway_config.json
+chmod 600 datum_gateway_config.json
+nano datum_gateway_config.json
 ```
 
-Example configuration (`ratum/datum_gateway_config.json`):
+Example configuration (`datum_gateway_config.json`):
 ```json
 {
   "bitcoind": {
@@ -73,7 +74,7 @@ Example configuration (`ratum/datum_gateway_config.json`):
 > **Protect your RPC credentials!**
 > Because `datum_gateway_config.json` contains your node's RPC password, restrict file permissions so only your user account can read it:
 > ```bash
-> chmod 600 ratum/datum_gateway_config.json
+> chmod 600 datum_gateway_config.json
 > ```
 
 ### 4. Start Mining

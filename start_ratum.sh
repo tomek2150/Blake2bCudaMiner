@@ -5,6 +5,9 @@
 set -e
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+if [ -d "$HOME/.cargo/bin" ] && [[ ":$PATH:" != *":$HOME/.cargo/bin:"* ]]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
 GATEWAY_DIR="${RATUM_DIR:-$HOME/ratum}"
 if [ ! -d "$GATEWAY_DIR" ] && [ -d "$HOME/test/ratum" ]; then
     GATEWAY_DIR="$HOME/test/ratum"
@@ -63,6 +66,8 @@ STARTED_GATEWAY=0
 if [ -z "$GATEWAY_PID" ]; then
     if [ ! -f "$GATEWAY_BIN" ]; then
         echo "  [ERROR] ratum-gateway binary not found at: $GATEWAY_BIN"
+        echo "  Please compile it first: cd $GATEWAY_DIR && cargo build --release --bin ratum-gateway"
+        echo "  (If cargo is missing: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y)"
         exit 1
     fi
     echo "  • Starting ratum-gateway in background..."

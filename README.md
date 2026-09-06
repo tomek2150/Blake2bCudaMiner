@@ -7,10 +7,18 @@ High-efficiency, lightweight CUDA GPU miner for **Bitcoin Knots (Blake2b PoW)**,
 ## 🚀 Quickstart Guide
 
 ### 1. Install Prerequisites (Ubuntu / Debian / WSL2)
+Install system packages:
 ```bash
 sudo apt update
-sudo apt install -y build-essential nvidia-cuda-toolkit libssl-dev pkg-config cargo git
+sudo apt install -y build-essential nvidia-cuda-toolkit libssl-dev pkg-config git curl
 ```
+
+Install official Rust & Cargo compiler (required to build `ratum-gateway`):
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"
+```
+
 > [!NOTE]
 > * **Bitcoin Knots Node:** Ensure your local Bitcoin Knots node is running with RPC enabled (`rpcport=38332`, `server=1`).
 > * **Native Linux (Bare Metal):** Ensure the proprietary NVIDIA graphics driver is installed (`nvidia-smi` displays your GPU). Inside WSL2, CUDA utilizes the Windows NVIDIA driver automatically.
@@ -29,6 +37,7 @@ git clone https://github.com/iohzrd/ratum.git ~/ratum
 cd ~/ratum
 cargo build --release --bin ratum-gateway
 ```
+*(If you encounter `cargo: command not found`, run: `source "$HOME/.cargo/env"` or install Rust via step 1).*
 
 Copy the example configuration to `~/ratum/datum_gateway_config.json` and enter your node RPC credentials and payout address:
 ```bash

@@ -31,21 +31,22 @@ make all
 ```
 
 ### 3. Setup Ratum Gateway
-Build `ratum-gateway` in your home directory (`~/ratum`):
+Inside your `Blake2bCudaMiner` directory, clone and build `ratum-gateway`:
 ```bash
-git clone https://github.com/iohzrd/ratum.git ~/ratum
-cd ~/ratum
+git clone https://github.com/iohzrd/ratum.git ratum
+cd ratum
 cargo build --release --bin ratum-gateway
+cd ..
 ```
 *(If you encounter `cargo: command not found`, run: `source "$HOME/.cargo/env"` or install Rust via step 1).*
 
-Copy the example configuration to `~/ratum/datum_gateway_config.json` and enter your node RPC credentials and payout address:
+Copy the example configuration to `ratum/datum_gateway_config.json` and enter your node RPC credentials and payout address:
 ```bash
-cp datum_gateway_config.example.json ~/ratum/datum_gateway_config.json
-nano ~/ratum/datum_gateway_config.json
+cp datum_gateway_config.example.json ratum/datum_gateway_config.json
+nano ratum/datum_gateway_config.json
 ```
 
-Example configuration (`~/ratum/datum_gateway_config.json`):
+Example configuration (`ratum/datum_gateway_config.json`):
 ```json
 {
   "bitcoind": {
@@ -72,7 +73,7 @@ Example configuration (`~/ratum/datum_gateway_config.json`):
 > **Protect your RPC credentials!**
 > Because `datum_gateway_config.json` contains your node's RPC password, restrict file permissions so only your user account can read it:
 > ```bash
-> chmod 600 ~/ratum/datum_gateway_config.json
+> chmod 600 ratum/datum_gateway_config.json
 > ```
 
 ### 4. Start Mining

@@ -8,11 +8,16 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 if [ -d "$HOME/.cargo/bin" ] && [[ ":$PATH:" != *":$HOME/.cargo/bin:"* ]]; then
     export PATH="$HOME/.cargo/bin:$PATH"
 fi
-GATEWAY_DIR="${RATUM_DIR:-$HOME/ratum}"
-if [ ! -d "$GATEWAY_DIR" ] && [ -d "$HOME/test/ratum" ]; then
+GATEWAY_DIR="${RATUM_DIR:-$SCRIPT_DIR/ratum}"
+if [ ! -d "$GATEWAY_DIR" ] && [ -d "$HOME/ratum" ]; then
+    GATEWAY_DIR="$HOME/ratum"
+elif [ ! -d "$GATEWAY_DIR" ] && [ -d "$HOME/test/ratum" ]; then
     GATEWAY_DIR="$HOME/test/ratum"
 fi
 GATEWAY_CONFIG="$GATEWAY_DIR/datum_gateway_config.json"
+if [ ! -f "$GATEWAY_CONFIG" ] && [ -f "$SCRIPT_DIR/datum_gateway_config.json" ]; then
+    GATEWAY_CONFIG="$SCRIPT_DIR/datum_gateway_config.json"
+fi
 GATEWAY_BIN="$GATEWAY_DIR/target/release/ratum-gateway"
 MINER_BIN="$SCRIPT_DIR/bin/b2bcudaminer"
 

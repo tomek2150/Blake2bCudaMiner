@@ -15,6 +15,3 @@ build/
 # Python bytecode
 __pycache__/
 *.pyc
-
-# Agent scratch directory
-_agent_scratch/

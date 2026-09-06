@@ -1,0 +1,26 @@
+{
+    "bitcoind": {
+        "rpcurl": "http://127.0.0.1:38332",
+        "rpcuser": "RPC_USER",
+        "rpcpassword": "YOUR_RPC_PASSWORD",
+        "work_update_seconds": 30
+    },
+    "stratum": {
+        "listen_addr": "127.0.0.1",
+        "listen_port": 3334,
+        "vardiff_min": 64
+    },
+    "mining": {
+        "pool_address": "YOUR_BITCOIN_PAYOUT_ADDRESS",
+        "coinbase_tag_primary": "Blake2bMiner",
+        "coinbase_tag_secondary": "name"
+    },
+    "datum": {
+        "pool_host": "pools-address",
+        "pool_port": 28915,
+        "pool_pubkey": "PuK",
+        "pool_pass_workers": true,
+        "pool_pass_full_users": true,
+        "pooled_mining_only": true
+    }
+}

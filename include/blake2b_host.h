@@ -20,6 +20,15 @@
 void blake2b_precompute_midstate(const uint8_t header_80[80], uint32_t target_diff_bits, blake2b_midstate_t* out_midstate);
 
 /**
+ * @brief Computes Blake2b-256 for arbitrary buffer up to 128 bytes.
+ * 
+ * @param data Input data buffer.
+ * @param len Length in bytes (<= 128).
+ * @param out_hash_32 Output buffer for the 32-byte hash.
+ */
+void blake2b_256(const uint8_t* data, size_t len, uint8_t out_hash_32[32]);
+
+/**
  * @brief CPU reference implementation of Blake2b-256 over 80 bytes.
  * 
  * @param header_80 80-byte block header.

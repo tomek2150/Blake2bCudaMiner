@@ -97,19 +97,15 @@ void blake2b_precompute_midstate(const uint8_t header_80[80], uint32_t target_di
     out_midstate->target_hi = (uint32_t)(out_midstate->target64 >> 32);
 }
 
-void blake2b_256_cpu_reference(const uint8_t header_80[80], uint8_t out_hash_32[32]) {
+void blake2b_256(const uint8_t* data, size_t len, uint8_t out_hash_32[32]) {
     uint64_t m[16] = {0};
-    std::memcpy(m, header_80, 80);
+    if (len > 0 && data != nullptr) {
+        std::memcpy(m, data, len > 128 ? 128 : len);
+    }
 
     uint64_t h[8];
     h[0] = IV[0] ^ 0x01010020ULL;
-    h[1] = IV[1];
-    h[2] = IV[2];
-    h[3] = IV[3];
-    h[4] = IV[4];
-    h[5] = IV[5];
-    h[6] = IV[6];
-    h[7] = IV[7];
+    for (int i = 1; i < 8; ++i) h[i] = IV[i];
 
     uint64_t v[16];
     for (int i = 0; i < 8; ++i) v[i] = h[i];
@@ -117,7 +113,7 @@ void blake2b_256_cpu_reference(const uint8_t header_80[80], uint8_t out_hash_32[
     v[9]  = IV[1];
     v[10] = IV[2];
     v[11] = IV[3];
-    v[12] = IV[4] ^ 80ULL;
+    v[12] = IV[4] ^ (uint64_t)len;
     v[13] = IV[5] ^ 0ULL;
     v[14] = IV[6] ^ 0xFFFFFFFFFFFFFFFFULL;
     v[15] = IV[7] ^ 0ULL;
@@ -140,4 +136,8 @@ void blake2b_256_cpu_reference(const uint8_t header_80[80], uint8_t out_hash_32[
         out_words[i] = h[i] ^ v[i] ^ v[i + 8];
     }
     std::memcpy(out_hash_32, out_words, 32);
+}
+
+void blake2b_256_cpu_reference(const uint8_t header_80[80], uint8_t out_hash_32[32]) {
+    blake2b_256(header_80, 80, out_hash_32);
 }

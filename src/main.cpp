@@ -174,7 +174,9 @@ int main(int argc, char** argv) {
         bool in_flight;
         uint32_t batch_size;
         std::string job_id;
+        std::string ntime_hex;
         uint32_t ntime;
+        bool is_ratum;
     };
 
     StreamSlot slots[2];
@@ -186,6 +188,7 @@ int main(int argc, char** argv) {
         cudaMallocHost(&slots[i].h_found_count, sizeof(uint32_t));
         slots[i].in_flight = false;
         slots[i].batch_size = 0;
+        slots[i].is_ratum = false;
     }
 
     StratumClient stratum(host, port, user, pass);
@@ -201,7 +204,9 @@ int main(int argc, char** argv) {
     stratum.set_job_callback([&](const StratumJobData& job) {
         current_job = job;
         blake2b_precompute_midstate(job.header_template, job.nbits, &current_midstate);
-        std::cout << "  • New Mining Job Received: ID " << job.job_id << " (Profile 0 80B Work Ready)" << std::endl;
+        std::cout << "  • New Mining Job Received: ID " << job.job_id 
+                  << (job.is_ratum ? " (Ratum Pool Work Ready)" : " (Profile 0 80B Work Ready)") 
+                  << std::endl;
         job_changed = true;
         new_job_ready = true;
     });
@@ -249,11 +254,11 @@ int main(int argc, char** argv) {
                         if (cnt > 16) cnt = 16;
                         for (uint32_t k = 0; k < cnt; ++k) {
                             uint64_t found = slots[i].h_found_nonces[k];
-                            uint32_t found_nonce = (uint32_t)found;
                             uint32_t found_nonce2 = (uint32_t)(found >> 32);
-                            char xn2_str[16];
+                            char xn2_str[17];
                             snprintf(xn2_str, sizeof(xn2_str), "%08x", found_nonce2);
-                            stratum.submit_share(slots[i].job_id, xn2_str, slots[i].ntime, found_nonce);
+                            std::string xn2 = slots[i].is_ratum ? "0000000000000000" : std::string(xn2_str);
+                            stratum.submit_share(slots[i].job_id, xn2, slots[i].ntime_hex, slots[i].ntime, found, slots[i].is_ratum);
                         }
                     }
                     total_hashes += slots[i].batch_size;
@@ -268,8 +273,16 @@ int main(int argc, char** argv) {
 
         // Calculate target difficulty threshold from Stratum difficulty
         double diff = stratum.get_difficulty();
-        uint64_t target_diff = (uint64_t)(0x00000000FFFF0000ULL / diff);
-        if (target_diff == 0) target_diff = 0x00000000FFFF0000ULL;
+        uint64_t target_diff;
+        if (current_job.is_ratum) {
+            // Ratum uses PoT (Power of Two) target: target = 2^(224 - pot)
+            // In top 64-bit word h0_be, bit index is 32 - pot:
+            uint32_t pot = (diff <= 1.0) ? 0 : (uint32_t)(63 - __builtin_clzll((uint64_t)diff));
+            target_diff = (pot < 32) ? (1ULL << (32 - pot)) : 1ULL;
+        } else {
+            target_diff = (uint64_t)(0x00000000FFFF0000ULL / diff);
+            if (target_diff == 0) target_diff = 0x00000000FFFF0000ULL;
+        }
 
         // Process completed results in cur_slot if in-flight
         if (slots[cur_slot].in_flight) {
@@ -279,11 +292,11 @@ int main(int argc, char** argv) {
                 if (cnt > 16) cnt = 16;
                 for (uint32_t k = 0; k < cnt; ++k) {
                     uint64_t found = slots[cur_slot].h_found_nonces[k];
-                    uint32_t found_nonce = (uint32_t)found;
                     uint32_t found_nonce2 = (uint32_t)(found >> 32);
-                    char xn2_str[16];
+                    char xn2_str[17];
                     snprintf(xn2_str, sizeof(xn2_str), "%08x", found_nonce2);
-                    stratum.submit_share(slots[cur_slot].job_id, xn2_str, slots[cur_slot].ntime, found_nonce);
+                    std::string xn2 = slots[cur_slot].is_ratum ? "0000000000000000" : std::string(xn2_str);
+                    stratum.submit_share(slots[cur_slot].job_id, xn2, slots[cur_slot].ntime_hex, slots[cur_slot].ntime, found, slots[cur_slot].is_ratum);
                 }
             }
             total_hashes += slots[cur_slot].batch_size;
@@ -292,7 +305,9 @@ int main(int argc, char** argv) {
 
         // Launch next mining batch asynchronously in cur_slot
         slots[cur_slot].job_id = current_job.job_id;
+        slots[cur_slot].ntime_hex = current_job.ntime_hex;
         slots[cur_slot].ntime = current_job.ntime;
+        slots[cur_slot].is_ratum = current_job.is_ratum;
         slots[cur_slot].batch_size = batch_size;
 
         cudaMemsetAsync(slots[cur_slot].d_found_count, 0, sizeof(uint32_t), slots[cur_slot].stream);

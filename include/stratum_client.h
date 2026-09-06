@@ -24,6 +24,7 @@ struct StratumJobData {
     uint32_t nbits;
     uint32_t ntime;
     uint32_t version;
+    bool is_ratum;
     uint8_t header_template[80]; // 80-byte base header template
 };
 
@@ -44,6 +45,7 @@ public:
 
     bool process_incoming_messages();
     bool submit_share(const std::string& job_id, const std::string& extranonce2_hex, uint32_t ntime, uint32_t nonce);
+    bool submit_share(const std::string& job_id, const std::string& extranonce2_hex, const std::string& ntime_hex, uint32_t ntime, uint64_t found_nonce64, bool is_ratum);
 
     double get_difficulty() const { return difficulty_; }
 

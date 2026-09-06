@@ -7,13 +7,13 @@
 
 
 
-# ⚡ Blake2bCudaMiner – Ratum Pool Edition
+# ⚡ Blake2bCudaMiner v2.0.0
 
-High-efficiency, lightweight CUDA GPU miner for **Bitcoin Knots (Blake2b PoW)**, optimized specifically for mining on the DATUM pool ([pool.iohzrd.tech](https://pool.iohzrd.tech/)) via the local [ratum-gateway](https://github.com/iohzrd/ratum).
+High-efficiency, lightweight CUDA GPU miner for **Bitcoin Knots (Blake2b PoW)**, supporting both **DATUM Pool Mining** ([pool.iohzrd.tech](https://pool.iohzrd.tech/)) via Ratum and **Solo Mining** via Stratum Proxy.
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Quickstart: Pool Mining (DATUM Pool)
 
 ### 1. Install Prerequisites (Ubuntu / Debian / WSL2)
 Install system packages:
@@ -34,7 +34,7 @@ source "$HOME/.cargo/env"
 
 ### 2. Build Blake2bCudaMiner
 ```bash
-git clone -b feature/ratum-pool https://github.com/tomek2150/Blake2bCudaMiner.git
+git clone https://github.com/tomek2150/Blake2bCudaMiner.git
 cd Blake2bCudaMiner
 make all
 ```
@@ -100,6 +100,23 @@ The script automatically:
 * Starts `ratum-gateway` in the background if not already running.
 * Launches the GPU miner with full shader saturation on your NVIDIA GPU (~6.8+ GH/s on RTX 5070 Ti).
 * Cleanly terminates background processes upon `Ctrl+C`.
+
+---
+
+## ⛏️ Solo Mining (Direct against your Node)
+
+If you prefer solo mining directly to your local Bitcoin Knots node without a pool:
+1. Configure `config.json` with your node RPC credentials:
+   ```bash
+   cp config.example.json config.json
+   chmod 600 config.json
+   nano config.json
+   ```
+2. Start the solo miner with the integrated stratum proxy:
+   ```bash
+   chmod +x start.sh
+   ./start.sh
+   ```
 
 ---
 

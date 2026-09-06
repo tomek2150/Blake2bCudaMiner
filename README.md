@@ -93,7 +93,7 @@ make all
 
 ---
 
-## 🏊 Mining Mode 1: DATUM Pool Mining (Recommended)
+## 🏊 Mining Mode 1: DATUM Pool Mining
 
 Connects to the DATUM mining pool ([pool.iohzrd.tech](https://pool.iohzrd.tech/)) via the local `ratum-gateway`.
 

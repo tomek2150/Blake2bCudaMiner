@@ -1,3 +1,12 @@
+> [!NOTE] 
+> There are no hidden fees programmed into the code. What you mine belongs to you. I spent several days coding this miner, so I would appreciate a donation if you use it :-)  
+> the power is with us bitcoiners ;-)
+>
+> bc1qq39udmr430qft85r0hvngcuchzc2xujuym0w67 (sha256 chain)  
+> bc1q3kqkcx9vdnnrg94d4yze3ds2vm722rr3xrk3f0 (blake2b chain)
+
+
+
 # ⚡ Blake2bCudaMiner – Ratum Pool Edition
 
 High-efficiency, lightweight CUDA GPU miner for **Bitcoin Knots (Blake2b PoW)**, optimized specifically for mining on the DATUM pool ([pool.iohzrd.tech](https://pool.iohzrd.tech/)) via the local [ratum-gateway](https://github.com/iohzrd/ratum).

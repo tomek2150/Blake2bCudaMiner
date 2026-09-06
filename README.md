@@ -7,7 +7,7 @@
 
 # ⚡ Blake2bCudaMiner v2.0.0
 
-High-efficiency, lightweight CUDA GPU miner for **Bitcoin Knots (Blake2b PoW)**, supporting both **DATUM Pool Mining** ([pool.iohzrd.tech](https://pool.iohzrd.tech/)) via Ratum and **Solo Mining** via an integrated Stratum proxy.
+High-efficiency, lightweight CUDA GPU miner for **Bitcoin Knots (Blake2b PoW)**, supporting both **DATUM Pool Mining** (e.g. [pool.iohzrd.tech](https://pool.iohzrd.tech/)) via Ratum and **Solo Mining** via an integrated Stratum proxy.
 
 ---
 

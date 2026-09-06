@@ -114,7 +114,7 @@ cp datum_gateway_config.example.json datum_gateway_config.json
 chmod 600 datum_gateway_config.json
 nano datum_gateway_config.json
 ```
-Fill in your node RPC credentials, payout address, and pool parameters:
+Fill in your node RPC credentials, payout address, and pool parameters (works for all pool addresses, this is just an example):
 ```json
 {
   "bitcoind": {

@@ -33,7 +33,7 @@ fi
 
 if [ -z "$ADDRESS" ]; then
     echo "================================================================="
-    echo " ⚡ Blake2bCudaMiner: Ratum Pool All-in-One Launcher"
+    echo " ⚡ Blake2bCudaMiner v2.0.0: Ratum Pool All-in-One Launcher"
     echo "================================================================="
     if [ ! -f "$GATEWAY_CONFIG" ]; then
         echo "  [ERROR] Configuration not found: $GATEWAY_CONFIG"

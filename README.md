@@ -131,5 +131,11 @@ Verify 100% mathematical consensus accuracy directly on your hardware:
 
 ---
 
+## 🔬 Technical Architecture & Deep-Dive Optimizations
+
+For low-level algorithmic details, hardware funnel shifts, PTX `lop3.lut` logic fusion, and zero-folding diagrams, see our dedicated [Technical Architecture & Optimizations Documentation](docs/architecture.md).
+
+---
+
 ## 📄 License
 Licensed under the **GNU General Public License v3.0 (GPL-3.0)**.

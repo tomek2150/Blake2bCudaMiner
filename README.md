@@ -2,7 +2,7 @@
 > all previous versions before v1.3.2 had a serious bug, please upgrade to the newest version!!!
 
 > [!NOTE] 
-> There are no hidden fees programmed into the code. What you mine belongs to you. I spent several days coding this miner, so I would appreciate a donation if you use it :-)  
+> There are no hidden fees programmed into the code. What you mine belongs to you. I spent several days coding this miner. I would appreciate a donation if you get some rewards with it :-)  
 > the power is with us bitcoiners ;-)
 >
 > bc1qq39udmr430qft85r0hvngcuchzc2xujuym0w67 (sha256 chain)  
